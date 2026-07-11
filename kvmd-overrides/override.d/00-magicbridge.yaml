@@ -1,0 +1,26 @@
+# MagicBridgeV2 kvmd overrides — merged by kvmd from /etc/kvmd/override.d/
+# We NEVER edit kvmd's own config files; we only add override snippets here.
+# Values below are safe defaults; the V4 Mini enables H.264/WebRTC natively.
+
+kvmd:
+    # Prefer H.264 (WebRTC) as the default transport, MJPEG as fallback.
+    streamer:
+        h264_bitrate:
+            default: 5000
+        desired_fps:
+            default: 40
+
+    # Mouse jiggler available (kvmd native) — off by default, user toggles in UI.
+    hid:
+        mouse:
+            jiggler:
+                enabled: false
+
+    # MagicBridgeV2 add-on info surfaced to the UI /api/info (read-only label).
+    info:
+        meta:
+            # Free-form metadata block; our UI reads this to show the brand + version.
+            magicbridge:
+                product: "MagicBridgeV2"
+                version: "2.0.0-dev"
+                upstream: "PiKVM/kvmd (GPLv3)"

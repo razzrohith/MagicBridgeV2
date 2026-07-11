@@ -1,0 +1,35 @@
+MagicBridgeV2
+Copyright (C) 2026 Raj (razzrohith)
+
+This product is a derivative work built on top of the PiKVM project and
+bundles/depends on the following Free Software, whose authorship and
+copyright are gratefully acknowledged:
+
+  PiKVM / kvmd    — The main PiKVM daemon
+                    Copyright (C) Maxim Devaev and the PiKVM contributors
+                    Licensed under the GNU General Public License v3.0
+                    https://github.com/pikvm/kvmd
+
+  ustreamer       — Lightweight and fast MJPEG-HTTP / H.264 streamer
+                    Copyright (C) Maxim Devaev and the PiKVM contributors
+                    Licensed under the GNU General Public License v3.0
+                    https://github.com/pikvm/ustreamer
+
+  PiKVM OS        — Arch Linux ARM based read-only OS image for PiKVM
+                    https://github.com/pikvm/os
+
+MagicBridgeV2 does NOT modify the upstream kvmd/ustreamer source in place.
+It runs the stock PiKVM software and adds:
+  - separate add-on services (services/, systemd/),
+  - configuration overrides (kvmd-overrides/, nginx/),
+  - branding and a replacement web UI (branding/, web/).
+
+Because MagicBridgeV2 as a whole is a derivative/combined work that links to
+and extends GPLv3 software, MagicBridgeV2 is distributed under the GNU General
+Public License v3.0. See the LICENSE file for the full terms.
+
+The "MagicBridge" and "MagicBridgeV2" names, logos and branding, and the
+original add-on code under services/ and web/, are Copyright (C) 2026 Raj.
+Trademarks and product names of PiKVM belong to their respective owners;
+MagicBridgeV2 is an independent project and is not endorsed by or affiliated
+with the PiKVM project.

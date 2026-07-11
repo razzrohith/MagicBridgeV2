@@ -1,0 +1,18 @@
+[Unit]
+Description=MagicBridgeV2 network toolkit (DuckDNS, Tailscale, lockdown, MAC, WiFi)
+After=network-online.target kvmd.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+Environment=MB_ROOT=/opt/magicbridge
+Environment=MB_NET_PORT=8410
+ExecStart=/usr/bin/python3 /opt/magicbridge/services/magicbridge-net/app.py
+Restart=on-failure
+RestartSec=5
+# hardening
+NoNewPrivileges=true
+ProtectHome=true
+
+[Install]
+WantedBy=multi-user.target

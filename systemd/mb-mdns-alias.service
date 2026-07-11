@@ -1,0 +1,13 @@
+[Unit]
+Description=MagicBridgeV2 mDNS aliases
+After=network-online.target avahi-daemon.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/mb-mdns-alias.sh
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

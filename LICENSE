@@ -1,0 +1,29 @@
+                    GNU GENERAL PUBLIC LICENSE
+                       Version 3, 29 June 2007
+
+MagicBridgeV2 — a self-hosted KVM-over-IP platform built on PiKVM/kvmd.
+Copyright (C) 2026 Raj (razzrohith)
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+--------------------------------------------------------------------------
+NOTE FOR MAINTAINER: This header is the standard GPLv3 application notice.
+Before the first public release, drop the FULL canonical GPLv3 text
+(the file the FSF distributes as COPYING, ~674 lines) in here or in a
+sibling COPYING file. It is intentionally not inlined in this scaffold to
+keep the working tree readable. Fetch it once with:
+    curl -fsSL https://www.gnu.org/licenses/gpl-3.0.txt -o COPYING
+MagicBridgeV2 derives from GPLv3 software (PiKVM kvmd, ustreamer) and MUST
+remain GPLv3. See NOTICE for attribution.
+--------------------------------------------------------------------------

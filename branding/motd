@@ -1,0 +1,8 @@
+
+  MagicBridgeV2  ·  Remote control, reimagined.
+  ─────────────────────────────────────────────
+  Web UI : https://magicbridge.local/
+  Base   : PiKVM OS / kvmd (GPLv3) — see /opt/magicbridge/NOTICE
+  Manage : systemctl status 'magicbridge-*'   |   kvmd status
+  Update : sudo /opt/magicbridge/magic-install.sh --update --no-reboot
+

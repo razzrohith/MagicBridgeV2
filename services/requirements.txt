@@ -1,0 +1,5 @@
+# MagicBridgeV2 add-on layer deps (kept minimal — kvmd already ships aiohttp/pyyaml).
+# Installed with: pip install --break-system-packages -r requirements.txt
+aiohttp>=3.9
+PyYAML>=6.0
+requests>=2.31

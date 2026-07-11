@@ -1,0 +1,27 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# Secrets / runtime (never commit)
+*.secret
+*.key
+*.pem
+branding/local.env
+services/**/config.local.json
+kvmd-overrides/secrets.yaml
+
+# OS / editor
+.DS_Store
+Thumbs.db
+*.swp
+.idea/
+.vscode/
+
+# Build / logs
+*.log
+build/
+dist/
+_scratch/
