@@ -134,16 +134,22 @@ async def set_identity(request: web.Request):
     ident["safe_mode"] = cur.get("safe_mode", False)
 
     loop = asyncio.get_running_loop()
-    await loop.run_in_executor(None, write_otg_override, ident)
-    ok, out = await loop.run_in_executor(None, rebuild_gadget)
+    try:
+        await loop.run_in_executor(None, write_otg_override, ident)
+        ok, out = await loop.run_in_executor(None, rebuild_gadget)
+    except Exception as e:
+        return web.json_response({"ok": False, "error": f"gadget apply failed: {e}"}, status=200)
     save_config("stealth", ident)
     return web.json_response({"ok": ok, "applied": ident, "detail": out[:1000]})
 
 async def random_serial(_):
     cur = current_identity(); cur["serial"] = rand_serial()
     loop = asyncio.get_running_loop()
-    await loop.run_in_executor(None, write_otg_override, cur)
-    ok, out = await loop.run_in_executor(None, rebuild_gadget)
+    try:
+        await loop.run_in_executor(None, write_otg_override, cur)
+        ok, out = await loop.run_in_executor(None, rebuild_gadget)
+    except Exception as e:
+        return web.json_response({"ok": False, "error": f"gadget apply failed: {e}"}, status=200)
     save_config("stealth", cur)
     return web.json_response({"ok": ok, "serial": cur["serial"], "detail": out[:500]})
 

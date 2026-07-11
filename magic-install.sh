@@ -131,6 +131,15 @@ phase3_rebrand() {
 # =====================================================================
 phase4_services() {
   say "Phase 4 — install add-on services"
+  # writable runtime state (survives read-only rootfs) + install-default config dir
+  run "mkdir -p /var/lib/magicbridge /etc/magicbridge"
+  run "chmod 700 /var/lib/magicbridge"
+  if [ ! -f /etc/magicbridge/kvmd.json ] && [ "$DRY_RUN" = 0 ]; then
+    # kvmd API creds used by our sidecars. Defaults match a fresh PiKVM install;
+    # edit this file if you change the kvmd/web password.
+    printf '{\n  "user": "admin",\n  "passwd": "admin",\n  "base": "https://127.0.0.1/api"\n}\n' > /etc/magicbridge/kvmd.json
+    chmod 600 /etc/magicbridge/kvmd.json
+  fi
   for unit in "$INSTALL_ROOT"/systemd/*.service; do
     [ -e "$unit" ] || continue
     run "install -Dm644 '$unit' \"/etc/systemd/system/$(basename "$unit")\""
