@@ -11,13 +11,13 @@ Legend: ☐ todo · ◐ in progress · ☑ done · ⊘ dropped (kvmd covers it /
 - ⊘ RAM-only logs, LUKS  → superseded by PiKVM read-only rootfs
 
 ## Port — MagicBridge add-on layer (services/)
-- ☐ magicbridge-stealth  — USB identity switch, safe-mode, custom fields, random serial
-- ☐ magicbridge-agent    — AI natural-language runner + macros (keys server-side)
-- ☐ magicbridge-net      — DuckDNS, Tailscale/Funnel wrappers, lockdown, MAC spoof, WiFi
-- ☐ magicbridge-common   — shared config, auth glue to kvmd, logging
+- ◐ magicbridge-stealth  — USB identity switch, safe-mode, custom fields, random serial  (CODE DONE; hw-validate gadget rebuild)
+- ◐ magicbridge-agent    — AI natural-language runner + macros (keys server-side)  (CODE DONE; hw-validate key events)
+- ◐ magicbridge-net      — DuckDNS✓, lockdown✓, MAC✓; Tailscale/Funnel/WiFi wrappers TODO
+- ☑ magicbridge-common   — mbcommon.py + kvmd_client.py (ATX/MSD/HID/GPIO/streamer/info)
 
 ## Redesign
-- ☐ Web UI  → new professional MagicBridgeV2 UI in web/ (wired to kvmd + our APIs)
+- ◐ Web UI  → professional MagicBridgeV2 cockpit in web/index.html (kvmd + our APIs)  (BUILT; served at /mb/ui/)
 - ☐ Auth    → reconcile with kvmd-auth; our panel uses kvmd session where possible
 - ☐ Config backup/restore  → target /etc/kvmd/override.d + our config
 - ☐ Update channel  → OS via pikvm-update; our layer via magic-install.sh --update

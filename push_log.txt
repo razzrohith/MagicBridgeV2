@@ -1,0 +1,59 @@
+Syncing C:\Users\razzr\Claude\Projects\MagicBridge\MagicBridgeV2  ->  E:\Startup\MagicbridgeV2
+Sync complete.
+> git rev-parse --is-inside-work-tree
+fatal: not a git repository (or any of the parent directories): .git
+> git init
+Initialized empty Git repository in E:/Startup/MagicbridgeV2/.git/
+> git branch -M main
+> git remote get-url origin
+error: No such remote 'origin'
+> git remote add origin https://github.com/razzrohith/MagicBridgeV2.git
+> git add -A
+warning: in the working copy of '.gitignore', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'LICENSE', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'NOTICE', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'README.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'VERSION', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'branding/apply_branding.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'branding/branding.env', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'branding/mb-mdns-alias.sh', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'branding/motd', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'docs/PORTING.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'kvmd-overrides/override.d/00-magicbridge.yaml', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'magic-install.sh', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'nginx/magicbridge.conf', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'services/common/mbcommon.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'services/magicbridge-net/app.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'services/requirements.txt', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'systemd/magicbridge-net.service', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'systemd/mb-mdns-alias.service', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'tools/push_to_github.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'web/theme.generated.css', LF will be replaced by CRLF the next time Git touches it
+> git commit -m scaffold MagicBridgeV2
+[main (root-commit) 985218f] scaffold MagicBridgeV2
+ 20 files changed, 906 insertions(+)
+ create mode 100644 .gitignore
+ create mode 100644 LICENSE
+ create mode 100644 NOTICE
+ create mode 100644 README.md
+ create mode 100644 VERSION
+ create mode 100644 branding/apply_branding.py
+ create mode 100644 branding/branding.env
+ create mode 100644 branding/mb-mdns-alias.sh
+ create mode 100644 branding/motd
+ create mode 100644 docs/PORTING.md
+ create mode 100644 kvmd-overrides/override.d/00-magicbridge.yaml
+ create mode 100644 magic-install.sh
+ create mode 100644 nginx/magicbridge.conf
+ create mode 100644 services/common/mbcommon.py
+ create mode 100644 services/magicbridge-net/app.py
+ create mode 100644 services/requirements.txt
+ create mode 100644 systemd/magicbridge-net.service
+ create mode 100644 systemd/mb-mdns-alias.service
+ create mode 100644 tools/push_to_github.py
+ create mode 100644 web/theme.generated.css
+> git push -u origin main
+branch 'main' set up to track 'origin/main'.
+To https://github.com/razzrohith/MagicBridgeV2.git
+ * [new branch]      main -> main
+DONE. Pushed to https://github.com/razzrohith/MagicBridgeV2.git branch main

@@ -1,0 +1,18 @@
+[Unit]
+Description=MagicBridgeV2 stealth USB identity service
+After=network-online.target kvmd.service kvmd-otg.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+Environment=MB_ROOT=/opt/magicbridge
+Environment=MB_STEALTH_PORT=8411
+ExecStart=/usr/bin/python3 /opt/magicbridge/services/magicbridge-stealth/app.py
+Restart=on-failure
+RestartSec=5
+# needs root to write override.d + restart kvmd-otg; keep other hardening on
+NoNewPrivileges=false
+ProtectHome=true
+
+[Install]
+WantedBy=multi-user.target
