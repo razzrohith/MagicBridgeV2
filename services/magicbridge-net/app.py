@@ -123,6 +123,44 @@ async def mac_spoof(request):
     })
 
 
+async def tailscale_ctl(request):
+    body = await request.json()
+    action = body.get("action", "status")
+    if action == "up":
+        rc, out = sh("tailscale", "up", "--accept-routes", timeout=30)
+    elif action == "down":
+        rc, out = sh("tailscale", "down", timeout=15)
+    else:
+        rc, out = sh("tailscale", "status", timeout=10)
+    return web.json_response({"ok": rc == 0, "action": action, "detail": out[:1500]})
+
+
+async def wifi_connect(request):
+    """POST /mb/net/wifi {ssid, password} — add/connect a Wi-Fi network via wpa_supplicant."""
+    body = await request.json()
+    ssid = body.get("ssid", "")
+    pw = body.get("password", "")
+    if not ssid:
+        return web.json_response({"ok": False, "error": "ssid required"}, status=400)
+    conf = "/etc/wpa_supplicant/wpa_supplicant-wlan0.conf"
+    # generate a network block and append (rw toggle for PiKVM read-only FS)
+    sh("bash", "-c", "command -v rw >/dev/null && rw || mount -o remount,rw /")
+    try:
+        rc, block = sh("wpa_passphrase", ssid, pw)
+        if rc != 0:
+            return web.json_response({"ok": False, "error": block[:300]}, status=502)
+        try:
+            with open(conf, "a") as f:
+                f.write("\n" + block + "\n")
+        except Exception as e:
+            return web.json_response({"ok": False, "error": str(e)}, status=500)
+        sh("systemctl", "restart", "wpa_supplicant@wlan0")
+    finally:
+        sh("bash", "-c", "command -v ro >/dev/null && ro || true")
+    cfg = load_config("net", {}); cfg["wifi"] = {"ssid": ssid}; save_config("net", cfg)
+    return web.json_response({"ok": True, "ssid": ssid, "note": "added; may take a few seconds to associate"})
+
+
 def build_app():
     app = web.Application()
     app.add_routes([
@@ -131,6 +169,8 @@ def build_app():
         web.post("/duckdns", duckdns_update),
         web.post("/lockdown", lockdown),
         web.post("/mac", mac_spoof),
+        web.post("/tailscale", tailscale_ctl),
+        web.post("/wifi", wifi_connect),
     ])
     return app
 

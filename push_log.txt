@@ -13,7 +13,6 @@ warning: in the working copy of 'branding/motd', LF will be replaced by CRLF the
 warning: in the working copy of 'docs/FEATURES.md', LF will be replaced by CRLF the next time Git touches it
 warning: in the working copy of 'docs/PORTING.md', LF will be replaced by CRLF the next time Git touches it
 warning: in the working copy of 'kvmd-overrides/override.d/00-magicbridge.yaml', LF will be replaced by CRLF the next time Git touches it
-warning: in the working copy of 'magic-install.sh', LF will be replaced by CRLF the next time Git touches it
 warning: in the working copy of 'nginx/magicbridge.conf', LF will be replaced by CRLF the next time Git touches it
 warning: in the working copy of 'services/common/kvmd_client.py', LF will be replaced by CRLF the next time Git touches it
 warning: in the working copy of 'services/common/mbcommon.py', LF will be replaced by CRLF the next time Git touches it
@@ -28,11 +27,13 @@ warning: in the working copy of 'systemd/mb-mdns-alias.service', LF will be repl
 warning: in the working copy of 'tools/push_to_github.py', LF will be replaced by CRLF the next time Git touches it
 warning: in the working copy of 'web/index.html', LF will be replaced by CRLF the next time Git touches it
 warning: in the working copy of 'web/theme.generated.css', LF will be replaced by CRLF the next time Git touches it
-> git commit -m audit fixes: read-only-rootfs config storage, error handling, installer state dir + kvmd creds
-[main e0c20a4] audit fixes: read-only-rootfs config storage, error handling, installer state dir + kvmd creds
- 5 files changed, 144 insertions(+), 88 deletions(-)
+warning: in the working copy of 'web/stealth/index.html', LF will be replaced by CRLF the next time Git touches it
+> git commit -m dedicated Stealth Control page (USB identity + MAC + EDID), nginx route, main UI repointed
+[main 62a90ab] dedicated Stealth Control page (USB identity + MAC + EDID), nginx route, main UI repointed
+ 4 files changed, 269 insertions(+), 30 deletions(-)
+ create mode 100644 web/stealth/index.html
 > git push -u origin main
 branch 'main' set up to track 'origin/main'.
 To https://github.com/razzrohith/MagicBridgeV2.git
-   86feaae..e0c20a4  main -> main
+   e0c20a4..62a90ab  main -> main
 DONE. Pushed to https://github.com/razzrohith/MagicBridgeV2.git branch main

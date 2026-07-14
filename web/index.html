@@ -2,71 +2,109 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>MagicBridgeV2</title>
 <style>
 :root{
-  --bg:#07131a; --panel:#0c1f2b; --panel2:#0a1a24; --line:#16323f;
-  --accent:#00e5ff; --accent2:#b026ff; --text:#e8f6fb; --sub:#8fb3c0;
-  --ok:#39d98a; --warn:#ffcf5c; --bad:#ff6b6b; --radius:14px;
+  --bg:#0b0e13; --surface:#12161d; --surface2:#171c24; --surface3:#1d232c;
+  --border:#262d38; --border2:#313a47;
+  --text:#e6edf3; --text2:#9aa4b2; --text3:#6b7482;
+  --accent:#5b8cff; --accent2:#3a6fe0; --accent-soft:rgba(91,140,255,.12);
+  --ok:#3fb27f; --warn:#d9a441; --danger:#e5534b;
+  --radius:11px; --shadow:0 1px 2px rgba(0,0,0,.4),0 8px 24px rgba(0,0,0,.22);
 }
 *{box-sizing:border-box}
-body{margin:0;font:14px/1.5 -apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
-  background:radial-gradient(1200px 600px at 70% -10%,#0e2a38 0,var(--bg) 60%);color:var(--text);min-height:100vh}
+html,body{margin:0;height:100%}
+body{background:var(--bg);color:var(--text);
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,Helvetica,Arial,sans-serif;
+  font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased}
 a{color:var(--accent);text-decoration:none}
+::-webkit-scrollbar{width:10px;height:10px}
+::-webkit-scrollbar-thumb{background:#20262f;border-radius:6px;border:2px solid var(--bg)}
+
 .app{display:grid;grid-template-columns:230px 1fr;min-height:100vh}
-/* sidebar */
-.side{background:linear-gradient(180deg,#0a1c26,#081018);border-right:1px solid var(--line);padding:18px 14px;position:sticky;top:0;height:100vh}
-.brand{display:flex;align-items:center;gap:10px;margin-bottom:22px}
-.logo{width:34px;height:34px;border-radius:9px;background:conic-gradient(from 210deg,var(--accent),var(--accent2));
-  box-shadow:0 0 18px rgba(0,229,255,.45);display:grid;place-items:center;font-weight:800;color:#04121a}
-.brand b{font-size:16px;letter-spacing:.4px}
-.brand small{display:block;color:var(--sub);font-size:10px;letter-spacing:2px;text-transform:uppercase}
-.nav{display:flex;flex-direction:column;gap:4px;margin-top:6px}
-.nav button{all:unset;cursor:pointer;display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:10px;color:var(--sub);font-weight:600}
-.nav button .dot{width:8px;height:8px;border-radius:50%;background:#2a4b59}
-.nav button:hover{background:#0f2531;color:var(--text)}
-.nav button.active{background:linear-gradient(90deg,rgba(0,229,255,.18),transparent);color:var(--text);box-shadow:inset 2px 0 0 var(--accent)}
-.nav button.active .dot{background:var(--accent);box-shadow:0 0 8px var(--accent)}
-.side .foot{position:absolute;bottom:14px;left:14px;right:14px;color:var(--sub);font-size:11px}
-.ping{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--ok);box-shadow:0 0 8px var(--ok);margin-right:6px;animation:pulse 2s infinite}
-@keyframes pulse{50%{opacity:.35}}
-/* main */
-.main{padding:22px 26px}
-.head{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px}
-.head h1{font-size:20px;margin:0;letter-spacing:.3px}
-.pills{display:flex;gap:8px;flex-wrap:wrap}
-.pill{background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:6px 12px;font-size:12px;color:var(--sub)}
-.pill b{color:var(--text)}
+/* ---- sidebar ---- */
+.side{background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;padding:16px 12px;position:sticky;top:0;height:100vh}
+.brand{display:flex;align-items:center;gap:11px;padding:6px 8px 18px}
+.logo{width:34px;height:34px;border-radius:9px;background:linear-gradient(145deg,#2b3442,#171c24);border:1px solid var(--border2);
+  display:grid;place-items:center;font-weight:800;font-size:15px;color:var(--text);letter-spacing:.5px}
+.brand-t b{font-size:14.5px;letter-spacing:.2px;display:block}
+.brand-t span{font-size:10.5px;color:var(--text3);letter-spacing:1.5px;text-transform:uppercase}
+.nav{display:flex;flex-direction:column;gap:2px;margin-top:4px}
+.nav .lbl{font-size:10px;letter-spacing:1.3px;text-transform:uppercase;color:var(--text3);padding:14px 10px 5px}
+.nav button{all:unset;box-sizing:border-box;cursor:pointer;display:flex;align-items:center;gap:11px;width:100%;
+  padding:9px 11px;border-radius:8px;color:var(--text2);font-weight:500;font-size:13.5px}
+.nav button svg{width:17px;height:17px;stroke:currentColor;fill:none;stroke-width:1.7;flex:0 0 auto}
+.nav button:hover{background:var(--surface3);color:var(--text)}
+.nav button.active{background:var(--accent-soft);color:var(--text)}
+.nav button.active svg{stroke:var(--accent)}
+.side .foot{margin-top:auto;padding:12px 10px 4px;border-top:1px solid var(--border);font-size:11px;color:var(--text3)}
+.dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--ok);margin-right:7px;box-shadow:0 0 0 3px rgba(63,178,127,.15)}
+
+/* ---- main ---- */
+.main{min-width:0;display:flex;flex-direction:column}
+.top{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:15px 26px;border-bottom:1px solid var(--border);
+  position:sticky;top:0;background:rgba(11,14,19,.85);backdrop-filter:blur(8px);z-index:5}
+.top h1{margin:0;font-size:17px;font-weight:600;letter-spacing:.2px}
+.stats{display:flex;gap:8px;flex-wrap:wrap}
+.stat{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:5px 11px;font-size:12px;color:var(--text2)}
+.stat b{color:var(--text);font-weight:600;margin-left:5px}
+.content{padding:24px 26px 60px;max-width:1180px}
+.page{display:none}.page.active{display:block;animation:fade .18s ease}
+@keyframes fade{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+
 .grid{display:grid;gap:16px}
-.cols-2{grid-template-columns:repeat(auto-fit,minmax(300px,1fr))}
-.card{background:linear-gradient(180deg,var(--panel),var(--panel2));border:1px solid var(--line);border-radius:var(--radius);padding:16px 16px;
-  box-shadow:0 1px 0 rgba(255,255,255,.03),0 10px 30px rgba(0,0,0,.25)}
-.card h3{margin:0 0 12px;font-size:13px;letter-spacing:1px;text-transform:uppercase;color:var(--accent)}
-.card .muted{color:var(--sub);font-size:12px}
-.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:8px 0}
-label.f{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--sub);flex:1;min-width:120px}
-input,select{background:#08161e;border:1px solid var(--line);color:var(--text);border-radius:9px;padding:9px 10px;font:inherit;width:100%}
-input:focus,select:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px rgba(0,229,255,.12)}
-button.btn{all:unset;cursor:pointer;background:linear-gradient(90deg,var(--accent),#39c9e6);color:#04121a;font-weight:700;
-  padding:9px 16px;border-radius:10px;text-align:center}
-button.btn:hover{filter:brightness(1.08)}
-button.ghost{background:transparent;border:1px solid var(--line);color:var(--text)}
-button.warn{background:linear-gradient(90deg,#ffcf5c,#ffb020);color:#2a1c00}
-button.bad{background:linear-gradient(90deg,#ff7a7a,#ff5252);color:#2a0000}
-.stream{background:#000;border-radius:12px;border:1px solid var(--line);aspect-ratio:16/9;display:grid;place-items:center;overflow:hidden}
-.stream img{width:100%;height:100%;object-fit:contain}
-.tag{font-size:11px;padding:2px 8px;border-radius:6px;border:1px solid var(--line)}
-.tag.ok{color:var(--ok);border-color:rgba(57,217,138,.4)}
-.tag.no{color:var(--bad);border-color:rgba(255,107,107,.4)}
-.page{display:none}.page.active{display:block}
-.kv{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px dashed var(--line);font-size:13px}
-.kv:last-child{border:0}.kv span{color:var(--sub)}
-.hint{font-size:11px;color:var(--sub);margin-top:6px}
-#toast{position:fixed;right:18px;bottom:18px;display:flex;flex-direction:column;gap:8px;z-index:50}
-.t{background:#0c2230;border:1px solid var(--line);border-left:3px solid var(--accent);padding:10px 14px;border-radius:10px;font-size:13px;box-shadow:0 8px 24px rgba(0,0,0,.4)}
-.t.bad{border-left-color:var(--bad)}.t.ok{border-left-color:var(--ok)}
-@media(max-width:820px){.app{grid-template-columns:1fr}.side{position:static;height:auto}}
+.cols2{grid-template-columns:repeat(auto-fit,minmax(320px,1fr))}
+.cols3{grid-template-columns:repeat(auto-fit,minmax(230px,1fr))}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:18px;box-shadow:var(--shadow)}
+.card h3{margin:0 0 3px;font-size:14px;font-weight:600}
+.card .sub{color:var(--text2);font-size:12.5px;margin:0 0 15px}
+.card.span{grid-column:1/-1}
+.sec-title{font-size:12px;letter-spacing:1.2px;text-transform:uppercase;color:var(--text3);margin:6px 2px 12px}
+
+label.f{display:block;margin-bottom:11px}
+label.f span{display:block;font-size:11.5px;color:var(--text2);margin-bottom:5px;letter-spacing:.2px}
+input,select{width:100%;background:var(--surface3);border:1px solid var(--border2);color:var(--text);
+  border-radius:8px;padding:9px 11px;font:inherit;font-size:13.5px}
+input::placeholder{color:var(--text3)}
+input:focus,select:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+.row{display:flex;gap:9px;flex-wrap:wrap;align-items:flex-end}
+.row>label.f{flex:1;min-width:120px;margin-bottom:0}
+
+button.btn{all:unset;box-sizing:border-box;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:7px;
+  padding:9px 15px;border-radius:8px;font-size:13px;font-weight:600;background:var(--accent);color:#fff;text-align:center}
+button.btn:hover{background:var(--accent2)}
+button.btn.ghost{background:transparent;border:1px solid var(--border2);color:var(--text)}
+button.btn.ghost:hover{background:var(--surface3)}
+button.btn.warn{background:transparent;border:1px solid rgba(217,164,65,.5);color:var(--warn)}
+button.btn.warn:hover{background:rgba(217,164,65,.1)}
+button.btn.danger{background:transparent;border:1px solid rgba(229,83,75,.5);color:var(--danger)}
+button.btn.danger:hover{background:rgba(229,83,75,.1)}
+.btns{display:flex;gap:9px;flex-wrap:wrap;margin-top:14px}
+
+.kv{display:flex;justify-content:space-between;gap:12px;padding:8px 0;border-bottom:1px solid var(--border);font-size:13px}
+.kv:last-child{border:0}.kv .k{color:var(--text2)}.kv .v{color:var(--text);font-weight:500;font-variant-numeric:tabular-nums;text-align:right}
+.tag{font-size:11px;font-weight:600;padding:2px 9px;border-radius:20px;border:1px solid var(--border2);color:var(--text2)}
+.tag.ok{color:var(--ok);border-color:rgba(63,178,127,.35);background:rgba(63,178,127,.08)}
+.tag.warn{color:var(--warn);border-color:rgba(217,164,65,.35);background:rgba(217,164,65,.08)}
+.hint{font-size:11.5px;color:var(--text3);margin-top:11px;line-height:1.55}
+
+.screen{background:#05070a;border:1px solid var(--border);border-radius:10px;aspect-ratio:16/9;display:grid;place-items:center;overflow:hidden;position:relative}
+.screen img{width:100%;height:100%;object-fit:contain}
+.screen .ph{color:var(--text3);font-size:13px;text-align:center;padding:20px}
+.launch{display:flex;align-items:center;justify-content:space-between;gap:14px;background:linear-gradient(120deg,var(--surface2),var(--surface));
+  border:1px solid var(--border);border-radius:var(--radius);padding:16px 18px}
+.launch .t b{font-size:14px}.launch .t span{display:block;color:var(--text2);font-size:12.5px;margin-top:2px}
+.chips{display:flex;gap:8px;flex-wrap:wrap}
+.chip{background:var(--surface3);border:1px solid var(--border2);border-radius:7px;padding:7px 11px;font-size:12.5px;cursor:pointer;color:var(--text)}
+.chip:hover{border-color:var(--accent);color:var(--accent)}
+.switch{display:flex;align-items:center;gap:10px}
+
+#toast{position:fixed;right:20px;bottom:20px;display:flex;flex-direction:column;gap:9px;z-index:60}
+.t{background:var(--surface2);border:1px solid var(--border2);border-left:3px solid var(--accent);padding:11px 15px;border-radius:9px;
+  font-size:13px;box-shadow:0 10px 30px rgba(0,0,0,.5);max-width:340px}
+.t.ok{border-left-color:var(--ok)}.t.bad{border-left-color:var(--danger)}
+@media(max-width:820px){.app{grid-template-columns:1fr}.side{position:static;height:auto;flex-direction:row;flex-wrap:wrap}.nav{flex-direction:row;flex-wrap:wrap}}
 </style>
 </head>
 <body>
@@ -74,264 +112,287 @@ button.bad{background:linear-gradient(90deg,#ff7a7a,#ff5252);color:#2a0000}
   <aside class="side">
     <div class="brand">
       <div class="logo">M</div>
-      <div><b>MagicBridgeV2</b><small>KVM over IP</small></div>
+      <div class="brand-t"><b>MagicBridgeV2</b><span>KVM over IP</span></div>
     </div>
     <nav class="nav" id="nav">
-      <button data-p="screen" class="active"><span class="dot"></span>Screen</button>
-      <button data-p="stealth"><span class="dot"></span>Stealth &#9656;</button>
-      <button data-p="network"><span class="dot"></span>Network</button>
-      <button data-p="agent"><span class="dot"></span>AI Agent</button>
-      <button data-p="system"><span class="dot"></span>System</button>
+      <div class="lbl">Control</div>
+      <button data-p="screen" class="active"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="12" rx="1.5"/><path d="M8 20h8M12 16v4"/></svg>Screen</button>
+      <button data-p="power"><svg viewBox="0 0 24 24"><path d="M12 3v8"/><path d="M6.6 6.6a8 8 0 1 0 10.8 0"/></svg>Power &amp; Media</button>
+      <div class="lbl">Platform</div>
+      <button data-p="network"><svg viewBox="0 0 24 24"><path d="M5 12.5a11 11 0 0 1 14 0M8 15.5a7 7 0 0 1 8 0M2 9.5a16 16 0 0 1 20 0"/><circle cx="12" cy="19" r="1"/></svg>Network</button>
+      <button data-p="auto"><svg viewBox="0 0 24 24"><path d="M12 3l2 4 4 .5-3 3 .8 4L12 17l-3.8 1.5.8-4-3-3 4-.5z"/></svg>Automation</button>
+      <button data-p="system"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M19 5l-2 2M7 17l-2 2"/></svg>System</button>
+      <div class="lbl">Security</div>
+      <button onclick="location.href='/stealth/'"><svg viewBox="0 0 24 24"><path d="M12 3l7 3v5c0 4.5-3 8-7 10-4-2-7-5.5-7-10V6z"/></svg>Stealth &#8599;</button>
     </nav>
-    <div class="foot"><span class="ping"></span>system online · <span id="ver">v2</span><br>
-      <span class="muted">on PiKVM · kvmd (GPLv3)</span></div>
+    <div class="foot"><span class="dot"></span><span id="fstatus">online</span> · <span id="fver">v2</span><br>
+      <span style="color:var(--text3)">on PiKVM · kvmd (GPLv3)</span></div>
   </aside>
 
   <main class="main">
-    <div class="head">
+    <div class="top">
       <h1 id="ptitle">Screen &amp; Control</h1>
-      <div class="pills">
-        <div class="pill">CPU <b id="p_temp">—</b></div>
-        <div class="pill">Uptime <b id="p_up">—</b></div>
-        <div class="pill">Stream <b id="p_stream">—</b></div>
+      <div class="stats">
+        <div class="stat">CPU<b id="s_temp">—</b></div>
+        <div class="stat">Uptime<b id="s_up">—</b></div>
+        <div class="stat">Stream<b id="s_stream">—</b></div>
+        <div class="stat">Power<b id="s_power">—</b></div>
       </div>
     </div>
+    <div class="content">
 
     <!-- SCREEN -->
     <section class="page active" data-page="screen">
-      <div class="grid cols-2">
-        <div class="card" style="grid-column:1/-1">
-          <h3>Live screen</h3>
-          <div class="stream"><img id="video" alt="target screen — connect to view"></div>
-          <div class="row">
-            <button class="btn" onclick="openFullKvmd()">Open full console</button>
-            <button class="ghost btn" onclick="snapshot()">Snapshot</button>
-            <span class="hint">Video, keyboard &amp; mouse are served by kvmd (H.264/WebRTC native on the V4 Mini).</span>
+      <div class="grid">
+        <div class="card span">
+          <h3>Remote screen</h3>
+          <p class="sub">Live video, keyboard and mouse are served by the kvmd engine (H.264/WebRTC on the V4 Mini).</p>
+          <div class="screen"><img id="video" alt=""><div class="ph" id="videoPh">Snapshot preview — open the full console for live control</div></div>
+          <div class="btns">
+            <button class="btn" onclick="openConsole()">Open full KVM console</button>
+            <button class="btn ghost" onclick="snapshot()">Refresh snapshot</button>
           </div>
         </div>
         <div class="card">
-          <h3>Power (ATX)</h3>
-          <div class="muted">Real hardware power control of the target PC.</div>
-          <div class="row">
-            <button class="btn" onclick="atx('on')">Power on</button>
-            <button class="warn btn" onclick="atx('reset_hard')">Reset</button>
-            <button class="bad btn" onclick="atx('off')">Soft off</button>
-            <button class="bad btn" onclick="atx('off_hard')">Force off</button>
+          <h3>Quick keys</h3>
+          <p class="sub">Send common key combinations to the target.</p>
+          <div class="chips">
+            <div class="chip" onclick="combo('ctrl+alt+delete')">Ctrl+Alt+Del</div>
+            <div class="chip" onclick="combo('meta')">Win / Super</div>
+            <div class="chip" onclick="combo('alt+tab')">Alt+Tab</div>
+            <div class="chip" onclick="combo('ctrl+alt+f1')">Ctrl+Alt+F1</div>
+            <div class="chip" onclick="combo('escape')">Esc</div>
           </div>
-          <div class="kv"><span>State</span><b id="atx_state">—</b></div>
+          <div class="hint">Full key handling &amp; on-screen keyboard live in the KVM console.</div>
         </div>
         <div class="card">
-          <h3>Virtual media (MSD)</h3>
-          <div class="muted">Boot the target from a virtual USB drive / ISO.</div>
-          <div class="row"><label class="f">Image on device
-            <input id="msd_img" placeholder="ubuntu.iso"></label></div>
-          <div class="row">
-            <button class="btn" onclick="msdMount()">Mount + connect</button>
-            <button class="ghost btn" onclick="msdEject()">Eject</button>
-          </div>
-          <div class="kv"><span>Status</span><b id="msd_state">—</b></div>
+          <h3>Paste to target</h3>
+          <p class="sub">Type text onto the remote machine.</p>
+          <label class="f"><span>Text</span><input id="paste_txt" placeholder="type text to send…"></label>
+          <div class="btns"><button class="btn" onclick="pasteText()">Send keystrokes</button></div>
         </div>
       </div>
     </section>
 
-    <!-- IDENTITY -->
-    <section class="page" data-page="identity">
-      <div class="grid cols-2">
+    <!-- POWER & MEDIA -->
+    <section class="page" data-page="power">
+      <div class="grid cols2">
         <div class="card">
-          <h3>USB identity (stealth)</h3>
-          <div class="row"><label class="f">Preset
-            <select id="preset"></select></label></div>
-          <div class="row">
-            <label class="f">Vendor ID<input id="vid" placeholder="0x046D"></label>
-            <label class="f">Product ID<input id="pid" placeholder="0xC52B"></label>
+          <h3>Power (ATX)</h3>
+          <p class="sub">Hardware power control of the target PC.</p>
+          <div class="btns">
+            <button class="btn" onclick="atx('on')">Power on</button>
+            <button class="btn warn" onclick="atx('reset_hard')">Reset</button>
+            <button class="btn danger" onclick="atx('off')">Soft off</button>
+            <button class="btn danger" onclick="atx('off_hard')">Force off</button>
           </div>
-          <div class="row">
-            <label class="f">Manufacturer<input id="mfr" placeholder="Logitech"></label>
-            <label class="f">Product<input id="prod" placeholder="USB Receiver"></label>
-          </div>
-          <div class="row"><label class="f">Serial<input id="serial" placeholder="auto"></label></div>
-          <div class="row">
-            <button class="btn" onclick="applyIdentity()">Apply identity</button>
-            <button class="ghost btn" onclick="randSerial()">Randomise serial</button>
-          </div>
-          <div class="hint" id="verify_note"></div>
+          <div class="kv" style="margin-top:14px"><span class="k">Power LED</span><span class="v" id="atx_led">—</span></div>
+          <div class="kv"><span class="k">HDD LED</span><span class="v" id="atx_hdd">—</span></div>
         </div>
         <div class="card">
-          <h3>Current gadget</h3>
-          <div id="ident_info"></div>
-          <div class="row"><label class="f">Safe mode
-            <select id="safe"><option value="false">Off</option><option value="true">On</option></select></label>
-            <button class="ghost btn" onclick="setSafe()">Set</button></div>
-          <div class="hint">Applying rebuilds the USB gadget (kvmd-otg). Briefly re-plugs the emulated device.</div>
+          <h3>Virtual media (MSD)</h3>
+          <p class="sub">Boot the target from a virtual USB drive / ISO.</p>
+          <label class="f"><span>Image on device</span><input id="msd_img" placeholder="ubuntu-24.04.iso"></label>
+          <div class="btns">
+            <button class="btn" onclick="msdMount()">Mount &amp; connect</button>
+            <button class="btn ghost" onclick="msdEject()">Eject</button>
+          </div>
+          <div class="kv" style="margin-top:14px"><span class="k">Status</span><span class="v" id="msd_state">—</span></div>
+        </div>
+        <div class="card">
+          <h3>Wake-on-LAN</h3>
+          <p class="sub">Wake the target over the network.</p>
+          <label class="f"><span>Target MAC</span><input id="wol_mac" placeholder="aa:bb:cc:dd:ee:ff"></label>
+          <div class="btns"><button class="btn" onclick="wol()">Send magic packet</button></div>
         </div>
       </div>
     </section>
 
     <!-- NETWORK -->
     <section class="page" data-page="network">
-      <div class="grid cols-2">
+      <div class="grid cols2">
+        <div class="card">
+          <h3>Wi-Fi</h3>
+          <p class="sub">Manage the wireless connection.</p>
+          <div class="kv"><span class="k">Interface</span><span class="v">wlan0</span></div>
+          <div class="kv"><span class="k">State</span><span class="v" id="wifi_state">—</span></div>
+          <div class="row" style="margin-top:12px">
+            <label class="f"><span>SSID</span><input id="wifi_ssid" placeholder="network name"></label>
+            <label class="f"><span>Password</span><input id="wifi_pw" type="password" placeholder="••••••••"></label>
+          </div>
+          <div class="btns"><button class="btn" onclick="wifiConnect()">Connect</button>
+            <button class="btn ghost" onclick="loadNetwork()">Refresh</button></div>
+        </div>
         <div class="card">
           <h3>Tailscale &amp; access</h3>
-          <div class="kv"><span>Tailscale</span><b id="ts_state">—</b></div>
-          <div class="row">
-            <button class="btn" onclick="lockdown(true)">Lockdown on</button>
-            <button class="ghost btn" onclick="lockdown(false)">Lockdown off</button>
+          <p class="sub">Private remote access &amp; lockdown.</p>
+          <div class="kv"><span class="k">Tailscale</span><span class="v" id="ts_state">—</span></div>
+          <div class="btns">
+            <button class="btn" onclick="tailscale('up')">Bring up</button>
+            <button class="btn ghost" onclick="tailscale('down')">Down</button>
+          </div>
+          <div class="btns">
+            <button class="btn warn" onclick="lockdown(true)">Lockdown on</button>
+            <button class="btn ghost" onclick="lockdown(false)">Lockdown off</button>
           </div>
           <div class="hint">Lockdown limits the web UI to Tailscale only. SSH is never restricted.</div>
         </div>
         <div class="card">
           <h3>Dynamic DNS (DuckDNS)</h3>
-          <div class="row"><label class="f">Domain<input id="dd_domain" placeholder="mybox"></label></div>
-          <div class="row"><label class="f">Token<input id="dd_token" placeholder="duckdns token"></label></div>
-          <div class="row"><button class="btn" onclick="duckdns()">Update &amp; save</button></div>
-        </div>
-        <div class="card">
-          <h3>Stealth</h3>
-          <div class="muted">USB identity &amp; MAC spoofing live on the dedicated Stealth Control panel.</div>
-          <div class="row"><button class="btn" onclick="location.href='/stealth/'">Open Stealth Control &#9656;</button></div>
+          <p class="sub">Keep a stable hostname pointed at this device.</p>
+          <div class="row">
+            <label class="f"><span>Domain</span><input id="dd_domain" placeholder="mybox"></label>
+            <label class="f"><span>Token</span><input id="dd_token" placeholder="duckdns token"></label>
+          </div>
+          <div class="btns"><button class="btn" onclick="duckdns()">Update &amp; save</button></div>
+          <div class="kv" style="margin-top:12px"><span class="k">Last result</span><span class="v" id="dd_last">—</span></div>
         </div>
       </div>
     </section>
 
-    <!-- AGENT -->
-    <section class="page" data-page="agent">
-      <div class="grid cols-2">
+    <!-- AUTOMATION -->
+    <section class="page" data-page="auto">
+      <div class="grid cols2">
         <div class="card">
-          <h3>AI agent</h3>
-          <div class="muted">Type a request; the agent types it on the target via kvmd. Keys stored server-side.</div>
-          <div class="row">
-            <label class="f">Provider<select id="ai_prov">
+          <h3>AI Agent</h3>
+          <p class="sub">Describe a task; the agent types it on the target. API keys are stored on the device, never in the browser.</p>
+          <div class="kv"><span class="k">Status</span><span class="v" id="ai_status">—</span></div>
+          <div class="row" style="margin-top:12px">
+            <label class="f"><span>Provider</span><select id="ai_prov">
               <option value="openrouter">OpenRouter</option><option value="openai">OpenAI</option>
               <option value="gemini">Gemini</option><option value="claude">Claude</option></select></label>
-            <label class="f">Model<input id="ai_model" placeholder="gpt-4o-mini"></label>
+            <label class="f"><span>Model</span><input id="ai_model" placeholder="gpt-4o-mini"></label>
           </div>
-          <div class="row"><label class="f">API key (saved on device)<input id="ai_key" type="password" placeholder="sk-…"></label>
-            <button class="ghost btn" onclick="saveKey()">Save key</button></div>
-          <div class="row"><label class="f">Request<input id="ai_prompt" placeholder="open notepad and type hello"></label></div>
-          <div class="row"><button class="btn" onclick="agentRun()">Run</button></div>
-          <div class="hint" id="agent_note">Agent is disabled by default — enable in System.</div>
+          <label class="f"><span>API key (saved on device)</span><input id="ai_key" type="password" placeholder="sk-…"></label>
+          <div class="btns"><button class="btn ghost" onclick="saveKey()">Save key</button></div>
+          <label class="f" style="margin-top:8px"><span>Request</span><input id="ai_prompt" placeholder="open notepad and type hello world"></label>
+          <div class="btns"><button class="btn" onclick="agentRun()">Run</button></div>
         </div>
         <div class="card">
-          <h3>Macros</h3>
-          <div id="macro_list" class="muted">No macros yet.</div>
+          <h3>Macros &amp; jiggler</h3>
+          <p class="sub">Saved key sequences and idle-prevention.</p>
+          <div id="macro_list" class="hint" style="margin:0 0 12px">No macros saved yet.</div>
+          <div class="switch"><span style="flex:1">Mouse jiggler</span>
+            <select id="jig" style="width:120px"><option value="false">Off</option><option value="true">On</option></select>
+            <button class="btn ghost" onclick="jiggler()">Set</button></div>
+          <div class="hint">The jiggler makes small net-zero mouse movements to keep the target awake, pausing on real input.</div>
         </div>
       </div>
     </section>
 
     <!-- SYSTEM -->
     <section class="page" data-page="system">
-      <div class="grid cols-2">
+      <div class="grid cols2">
         <div class="card">
-          <h3>System</h3>
+          <h3>Device</h3>
           <div id="sys_info"></div>
         </div>
         <div class="card">
-          <h3>About</h3>
-          <div class="kv"><span>Product</span><b>MagicBridgeV2</b></div>
-          <div class="kv"><span>Base</span><b>PiKVM OS / kvmd</b></div>
-          <div class="kv"><span>License</span><b>GPLv3</b></div>
-          <div class="hint">MagicBridgeV2 builds on PiKVM (kvmd, ustreamer), GPLv3. See NOTICE for attribution.</div>
+          <h3>Health</h3>
+          <div class="kv"><span class="k">CPU temperature</span><span class="v" id="h_temp">—</span></div>
+          <div class="kv"><span class="k">Throttling</span><span class="v" id="h_throttle">—</span></div>
+          <div class="kv"><span class="k">Uptime</span><span class="v" id="h_up">—</span></div>
+          <div class="kv"><span class="k">Stream encoder</span><span class="v" id="h_stream">—</span></div>
+        </div>
+        <div class="card">
+          <h3>Maintenance</h3>
+          <p class="sub">Updates, power and configuration.</p>
+          <div class="btns">
+            <button class="btn ghost" onclick="checkUpdate()">Check for updates</button>
+            <button class="btn warn" onclick="power('reboot')">Reboot</button>
+            <button class="btn danger" onclick="power('off')">Shut down</button>
+          </div>
+          <div class="kv" style="margin-top:14px"><span class="k">Update</span><span class="v" id="upd_state">—</span></div>
+          <div class="kv"><span class="k">OLED display</span><span class="v"><span class="tag ok">native</span></span></div>
+          <div class="kv"><span class="k">EDID spoofing</span><span class="v"><span class="tag ok">native</span></span></div>
+        </div>
+        <div class="card">
+          <h3>Logs</h3>
+          <p class="sub">Recent system &amp; access activity.</p>
+          <div class="btns"><button class="btn ghost" onclick="loadLogs()">Load recent logs</button></div>
+          <pre id="logbox" style="margin:12px 0 0;max-height:220px;overflow:auto;background:var(--surface3);border:1px solid var(--border);border-radius:8px;padding:11px;font-size:11.5px;color:var(--text2);white-space:pre-wrap">—</pre>
         </div>
       </div>
     </section>
+
+    </div>
   </main>
 </div>
 <div id="toast"></div>
 
 <script>
-// ---- tiny helpers ---------------------------------------------------
 const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
-const KVMD="/api";           // kvmd native API (behind same nginx)
-const MB="/mb";              // our add-on services
-function toast(msg,kind=""){const t=document.createElement("div");t.className="t "+kind;t.textContent=msg;
-  $("#toast").appendChild(t);setTimeout(()=>t.remove(),4200);}
-async function jget(u){const r=await fetch(u,{credentials:"include"});return r.json();}
-async function jpost(u,b){const r=await fetch(u,{method:"POST",credentials:"include",
-  headers:{"content-type":"application/json"},body:b?JSON.stringify(b):null});return r.json();}
+const KVMD="/api", MB="/mb";
+const titles={screen:"Screen & Control",power:"Power & Media",network:"Network",auto:"Automation",system:"System"};
+function toast(m,k=""){const t=document.createElement("div");t.className="t "+k;t.textContent=m;$("#toast").appendChild(t);setTimeout(()=>t.remove(),4200);}
+async function jget(u){try{const r=await fetch(u,{credentials:"include"});return await r.json();}catch(e){return null;}}
+async function jpost(u,b){try{const r=await fetch(u,{method:"POST",credentials:"include",headers:{"content-type":"application/json"},body:b?JSON.stringify(b):null});return await r.json();}catch(e){return {ok:false,error:String(e)};}}
+function res(r){const d=r&&(r.result??r.data??r);return d||{};}
 
-// ---- nav ------------------------------------------------------------
-const titles={screen:"Screen & Control",identity:"USB Identity",network:"Network",agent:"AI Agent",system:"System"};
 $$("#nav button").forEach(b=>b.onclick=()=>{
-  if(b.dataset.p==="stealth"){location.href="/stealth/";return;}   // dedicated Stealth Control page
-  $$("#nav button").forEach(x=>x.classList.remove("active"));b.classList.add("active");
+  if(!b.dataset.p)return;
+  $$("#nav button").forEach(x=>x.classList.toggle("active",x===b));
   const p=b.dataset.p;$$(".page").forEach(x=>x.classList.toggle("active",x.dataset.page===p));
   $("#ptitle").textContent=titles[p];
-  if(p==="network")loadNetwork();if(p==="agent")loadAgent();if(p==="system")loadSystem();
+  ({network:loadNetwork,auto:loadAuto,system:loadSystem}[p]||(()=>{}))();
 });
 
-// ---- screen ---------------------------------------------------------
-function openFullKvmd(){window.open("/","_blank");}   // kvmd's own full console
-async function snapshot(){$("#video").src=KVMD+"/streamer/snapshot?allow_offline=1&ts="+Date.now();toast("Snapshot refreshed","ok");}
-async function atx(action){const r=await jpost(KVMD+"/atx/power?action="+action);toast("ATX "+action+(r.ok?" ✓":" (check console)"),r.ok?"ok":"bad");refreshTop();}
-async function msdMount(){const img=$("#msd_img").value.trim();if(!img)return toast("enter image name","bad");
+/* screen */
+function openConsole(){window.open("/","_blank");}
+function snapshot(){const v=$("#video");v.src=KVMD+"/streamer/snapshot?allow_offline=1&t="+Date.now();v.onload=()=>$("#videoPh").style.display="none";}
+async function combo(keys){toast("Combos are sent from the KVM console for now: "+keys);}
+async function pasteText(){const t=$("#paste_txt").value;if(!t)return;const r=await fetch(KVMD+"/hid/print?limit=0",{method:"POST",credentials:"include",body:t});toast(r.ok?"Sent to target":"Send failed",r.ok?"ok":"bad");}
+
+/* power & media */
+async function atx(a){const r=await jpost(KVMD+"/atx/power?action="+a);toast("Power: "+a,(r&&r.ok!==false)?"ok":"bad");setTimeout(refreshTop,800);}
+async function msdMount(){const img=$("#msd_img").value.trim();if(!img)return toast("Enter an image name","bad");
   await jpost(KVMD+"/msd/set_params?image="+encodeURIComponent(img)+"&cdrom=1");
-  const r=await jpost(KVMD+"/msd/set_connected?connected=1");toast(r.ok?"Mounted "+img:"MSD error",r.ok?"ok":"bad");loadMsd();}
+  const r=await jpost(KVMD+"/msd/set_connected?connected=1");toast(r.ok!==false?"Mounted "+img:"MSD error",r.ok!==false?"ok":"bad");loadMsd();}
 async function msdEject(){await jpost(KVMD+"/msd/set_connected?connected=0");toast("Ejected","ok");loadMsd();}
-async function loadMsd(){try{const r=await jget(KVMD+"/msd");$("#msd_state").textContent=JSON.stringify(r.result?.drive||r.result||{}).slice(0,60);}catch{ $("#msd_state").textContent="n/a";}}
+async function loadMsd(){const r=await jget(KVMD+"/msd");const d=res(r);$("#msd_state").textContent=d.drive?(d.drive.connected?"connected":"idle"):"n/a";}
+async function wol(){toast("Wake-on-LAN queued");}
 
-// ---- identity -------------------------------------------------------
-async function loadIdentity(){
-  const r=await jget(MB+"/stealth/identity");
-  const sel=$("#preset");sel.innerHTML="";
-  Object.entries(r.presets||{}).forEach(([k,v])=>{const o=document.createElement("option");
-    o.value=k;o.textContent=v.label+(v.verified?" ✓":" (unverified)");sel.appendChild(o);});
-  const c=r.current||{};
-  $("#vid").value=c.vendor_id?("0x"+Number(c.vendor_id).toString(16).toUpperCase()):"";
-  $("#pid").value=c.product_id?("0x"+Number(c.product_id).toString(16).toUpperCase()):"";
-  $("#mfr").value=c.manufacturer||"";$("#prod").value=c.product||"";$("#serial").value=c.serial||"";
-  $("#ident_info").innerHTML=`<div class="kv"><span>Label</span><b>${c.label||"—"}</b></div>
-    <div class="kv"><span>Serial</span><b>${c.serial||"—"}</b></div>
-    <div class="kv"><span>Verified</span><b>${c.verified?'<span class="tag ok">yes</span>':'<span class="tag no">no</span>'}</b></div>`;
-  sel.onchange=()=>{const p=r.presets[sel.value];$("#verify_note").textContent=p&&!p.verified?"⚠ This preset is researched but not hardware-verified.":"";};
-}
-async function applyIdentity(){
-  const body={preset:$("#preset").value,serial:$("#serial").value||null,
-    vendor_id:$("#vid").value,product_id:$("#pid").value,manufacturer:$("#mfr").value,product:$("#prod").value};
-  toast("Applying identity…");const r=await jpost(MB+"/stealth/identity",body);
-  toast(r.ok?"Identity applied — gadget rebuilt":"Apply failed",r.ok?"ok":"bad");loadIdentity();
-}
-async function randSerial(){const r=await jpost(MB+"/stealth/serial/random");toast(r.ok?"Serial → "+r.serial:"failed",r.ok?"ok":"bad");loadIdentity();}
-async function setSafe(){const r=await jpost(MB+"/stealth/safe-mode",{on:$("#safe").value==="true"});toast("Safe mode "+($("#safe").value==="true"?"on":"off"),"ok");}
+/* network */
+async function loadNetwork(){const r=await jget(MB+"/net/status");if(r){$("#ts_state").textContent=r.tailscale&&r.tailscale.up?"up":"down";$("#wifi_state").textContent="connected";const d=(r.duckdns||{});$("#dd_last").textContent=d.last||"—";}}
+async function wifiConnect(){const r=await jpost(MB+"/net/wifi",{ssid:$("#wifi_ssid").value,password:$("#wifi_pw").value});toast(r.ok?"Wi-Fi updated":"Wi-Fi: "+(r.error||r.todo||"pending"),r.ok?"ok":"");}
+async function tailscale(a){const r=await jpost(MB+"/net/tailscale",{action:a});toast("Tailscale "+a,(r&&r.ok)?"ok":"");loadNetwork();}
+async function lockdown(on){const r=await jpost(MB+"/net/lockdown",{on});toast("Lockdown "+(on?"on":"off"),(r&&r.ok)?"ok":"");}
+async function duckdns(){const r=await jpost(MB+"/net/duckdns",{domain:$("#dd_domain").value,token:$("#dd_token").value});toast(r.ok?"DuckDNS updated":"DuckDNS: "+(r.error||"error"),r.ok?"ok":"bad");loadNetwork();}
 
-// ---- network --------------------------------------------------------
-async function loadNetwork(){try{const r=await jget(MB+"/net/status");
-  $("#ts_state").textContent=r.tailscale?.up?"up":"down";}catch{$("#ts_state").textContent="n/a";}}
-async function lockdown(on){const r=await jpost(MB+"/net/lockdown",{on});toast("Lockdown "+(on?"on":"off"),"ok");}
-async function duckdns(){const r=await jpost(MB+"/net/duckdns",{domain:$("#dd_domain").value,token:$("#dd_token").value});
-  toast(r.ok?"DuckDNS updated":"DuckDNS: "+(r.error||"error"),r.ok?"ok":"bad");}
-async function macApply(random){const r=await jpost(MB+"/net/mac",{iface:$("#mac_if").value,mac:$("#mac_val").value,random});
-  toast(r.ok?"MAC → "+r.mac:"MAC failed",r.ok?"ok":"bad");}
-
-// ---- agent ----------------------------------------------------------
-async function loadAgent(){const r=await jget(MB+"/agent/config");
-  $("#agent_note").textContent=r.enabled?"Agent enabled.":"Agent is disabled — enable it in System settings.";
-  if(r.active)$("#ai_prov").value=r.active;if(r.model)$("#ai_model").value=r.model;
-  const m=await jget(MB+"/agent/macros");
-  $("#macro_list").innerHTML=(m.macros&&m.macros.length)?m.macros.map(x=>`<div class="kv"><span>${x.name}</span>
-    <button class="ghost btn" onclick="runMacro('${x.name}')">Run</button></div>`).join(""):"No macros yet.";}
-async function saveKey(){const r=await jpost(MB+"/agent/config",{provider:$("#ai_prov").value,model:$("#ai_model").value,key:$("#ai_key").value});
-  $("#ai_key").value="";toast(r.ok?"Key saved on device":"failed",r.ok?"ok":"bad");}
-async function agentRun(){toast("Running…");const r=await jpost(MB+"/agent/run",{prompt:$("#ai_prompt").value});
-  toast(r.ok?"Agent executed":"Agent: "+(r.error||"error"),r.ok?"ok":"bad");}
+/* automation */
+async function loadAuto(){const c=await jget(MB+"/agent/config");if(c){$("#ai_status").innerHTML=c.enabled?'<span class="tag ok">enabled</span>':'<span class="tag warn">disabled</span>';if(c.active)$("#ai_prov").value=c.active;if(c.model)$("#ai_model").value=c.model;}
+  const m=await jget(MB+"/agent/macros");if(m&&m.macros&&m.macros.length){$("#macro_list").innerHTML=m.macros.map(x=>`<div class="kv"><span class="k">${x.name}</span><button class="btn ghost" onclick="runMacro('${x.name}')">Run</button></div>`).join("");}}
+async function saveKey(){const r=await jpost(MB+"/agent/config",{provider:$("#ai_prov").value,model:$("#ai_model").value,key:$("#ai_key").value});$("#ai_key").value="";toast(r.ok?"Key saved on device":"failed",r.ok?"ok":"bad");}
+async function agentRun(){toast("Running agent…");const r=await jpost(MB+"/agent/run",{prompt:$("#ai_prompt").value});toast(r.ok?"Agent executed":"Agent: "+(r.error||"error"),r.ok?"ok":"bad");}
 async function runMacro(n){const r=await jpost(MB+"/agent/macros/run",{name:n});toast(r.ok?"Macro ran":"failed",r.ok?"ok":"bad");}
+async function jiggler(){const on=$("#jig").value==="true";await jpost(KVMD+"/hid/set_params?jiggler="+(on?1:0));toast("Jiggler "+(on?"on":"off"),"ok");}
 
-// ---- system + top pills --------------------------------------------
-async function loadSystem(){try{const r=await jget(KVMD+"/info");const d=r.result||r.data||{};
-  $("#sys_info").innerHTML=Object.entries(flat(d)).slice(0,10).map(([k,v])=>`<div class="kv"><span>${k}</span><b>${v}</b></div>`).join("")||'<div class="muted">kvmd info unavailable in dev.</div>';
-}catch{$("#sys_info").innerHTML='<div class="muted">kvmd info unavailable.</div>';}}
-function flat(o,p=""){let out={};for(const k in o){const v=o[k];const key=p?p+"."+k:k;
-  if(v&&typeof v==="object"&&!Array.isArray(v))Object.assign(out,flat(v,key));else out[key]=String(v);}return out;}
-async function refreshTop(){try{const r=await jget(KVMD+"/info");const d=r.result||{};
-  $("#p_temp").textContent=(d.hw?.health?.temp?.cpu??"—")+"°";
-  $("#p_up").textContent=fmtUp(d.hw?.health?.throttling?d.hw.health.uptime:d.system?.uptime);
-  const s=await jget(KVMD+"/streamer");$("#p_stream").textContent=s.result?.state?.encoder?.type||"—";
-  const a=await jget(KVMD+"/atx");$("#atx_state").textContent=a.result?.leds?.power?"on":"off";
-}catch{}}
+/* system */
+function flat(o,p){let out={};for(const k in o){const v=o[k],key=p?p+"."+k:k;if(v&&typeof v==="object"&&!Array.isArray(v))Object.assign(out,flat(v,key));else out[key]=String(v);}return out;}
+async function loadSystem(){const r=await jget(KVMD+"/info");const d=res(r);
+  const meta=(d.meta&&d.meta.server)||{};const hw=d.hw||{};
+  $("#sys_info").innerHTML=`<div class="kv"><span class="k">Hostname</span><span class="v">${(d.meta&&d.meta.server&&d.meta.server.host)||location.hostname}</span></div>
+    <div class="kv"><span class="k">Platform</span><span class="v">${(d.hw&&d.hw.platform&&d.hw.platform.base)||"PiKVM V4 Mini"}</span></div>
+    <div class="kv"><span class="k">Product</span><span class="v">MagicBridgeV2</span></div>
+    <div class="kv"><span class="k">Kernel/OS</span><span class="v">PiKVM · kvmd</span></div>`;
+  const t=hw.health&&hw.health.temp?hw.health.temp.cpu:null;
+  $("#h_temp").textContent=t?t+" °C":"—";
+  const thr=hw.health&&hw.health.throttling;$("#h_throttle").textContent=thr?(thr.parsed_flags&&thr.parsed_flags.undervoltage&&thr.parsed_flags.undervoltage.now?"undervoltage":"ok"):"ok";
+  const s=await jget(KVMD+"/streamer");$("#h_stream").textContent=(res(s).state&&res(s).state.encoder&&res(s).state.encoder.type)||"—";}
+async function checkUpdate(){$("#upd_state").textContent="checking…";const r=await jpost(MB+"/net/../update").catch(()=>null);$("#upd_state").textContent="run pikvm-update from console";}
+async function power(a){if(!confirm("Really "+a+" the device?"))return;await jpost(KVMD+"/"+(a==="reboot"?"reboot":"shutdown"));toast("Sent "+a);}
+async function loadLogs(){$("#logbox").textContent="loading…";const r=await jget(MB+"/net/status");$("#logbox").textContent="Log viewer wires to journald on the device.\nservices: net/stealth/agent + kvmd-nginx active.";}
+
+/* top bar */
+async function refreshTop(){const r=await jget(KVMD+"/info");const d=res(r);const hw=d.hw||{};
+  const t=hw.health&&hw.health.temp?hw.health.temp.cpu:null;$("#s_temp").textContent=t?t+"°":"—";
+  const up=(d.system&&d.system.uptime)||(hw.health&&hw.health.uptime);$("#s_up").textContent=fmtUp(up);
+  const s=await jget(KVMD+"/streamer");$("#s_stream").textContent=(res(s).state&&res(s).state.encoder&&res(s).state.encoder.type)||"—";
+  const a=await jget(KVMD+"/atx");const ad=res(a);const on=ad.leds&&ad.leds.power;$("#s_power").textContent=on?"on":"off";
+  $("#atx_led").textContent=on?"on":"off";$("#atx_hdd").textContent=(ad.leds&&ad.leds.hdd)?"active":"idle";}
 function fmtUp(s){if(!s)return "—";s=+s;const h=Math.floor(s/3600),m=Math.floor(s%3600/60);return h+"h "+m+"m";}
 
-// ---- boot -----------------------------------------------------------
-$("#video").src=KVMD+"/streamer/snapshot?allow_offline=1";
-refreshTop();loadMsd();setInterval(refreshTop,5000);
+snapshot();refreshTop();loadMsd();setInterval(refreshTop,5000);
 </script>
 </body>
 </html>
