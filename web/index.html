@@ -91,6 +91,10 @@ button.btn.danger:hover{background:rgba(229,83,75,.1)}
 
 .screen{background:#05070a;border:1px solid var(--border);border-radius:10px;aspect-ratio:16/9;display:grid;place-items:center;overflow:hidden;position:relative}
 .screen img{width:100%;height:100%;object-fit:contain}
+.led{width:8px;height:8px;border-radius:50%;background:var(--text3);display:inline-block;vertical-align:middle;margin-right:4px}
+.led.g{background:var(--ok)}.led.r{background:var(--danger)}.led.y{background:var(--warn)}
+#streamBox{outline:none}
+#streamBox.cap{box-shadow:0 0 0 2px var(--accent)}
 .screen .ph{color:var(--text3);font-size:13px;text-align:center;padding:20px}
 .launch{display:flex;align-items:center;justify-content:space-between;gap:14px;background:linear-gradient(120deg,var(--surface2),var(--surface));
   border:1px solid var(--border);border-radius:var(--radius);padding:16px 18px}
@@ -144,32 +148,45 @@ button.btn.danger:hover{background:rgba(229,83,75,.1)}
     <!-- SCREEN -->
     <section class="page active" data-page="screen">
       <div class="grid">
-        <div class="card span">
-          <h3>Remote screen</h3>
-          <p class="sub">Live video, keyboard and mouse are served by the kvmd engine (H.264/WebRTC on the V4 Mini).</p>
-          <div class="screen"><img id="video" alt=""><div class="ph" id="videoPh">Snapshot preview — open the full console for live control</div></div>
-          <div class="btns">
-            <button class="btn" onclick="openConsole()">Open full KVM console</button>
-            <button class="btn ghost" onclick="snapshot()">Refresh snapshot</button>
+        <div class="card span" style="padding:14px">
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:11px;flex-wrap:wrap">
+            <div style="display:flex;gap:16px;align-items:center;font-size:12px;color:var(--text2)">
+              <span><span class="led" id="ledLink"></span>Link</span>
+              <span><span class="led" id="ledKbd"></span>Keyboard</span>
+              <span><span class="led" id="ledMouse"></span>Mouse</span>
+            </div>
+            <div class="btns" style="margin:0">
+              <button class="btn" id="capBtn" onclick="kvmToggleCapture()">Capture</button>
+              <select id="mouseMode" onchange="kvmMouseMode()" style="width:auto">
+                <option value="abs">Absolute mouse</option><option value="rel">Relative mouse</option></select>
+              <button class="btn ghost" onclick="kvmFullscreen()">Fullscreen</button>
+            </div>
           </div>
-        </div>
-        <div class="card">
-          <h3>Quick keys</h3>
-          <p class="sub">Send common key combinations to the target.</p>
-          <div class="chips">
-            <div class="chip" onclick="combo('ctrl+alt+delete')">Ctrl+Alt+Del</div>
-            <div class="chip" onclick="combo('meta')">Win / Super</div>
-            <div class="chip" onclick="combo('alt+tab')">Alt+Tab</div>
-            <div class="chip" onclick="combo('ctrl+alt+f1')">Ctrl+Alt+F1</div>
-            <div class="chip" onclick="combo('escape')">Esc</div>
+          <div class="screen" id="streamBox" tabindex="0">
+            <img id="video" alt="">
+            <div class="ph" id="videoPh">Click <b>Capture</b> to take keyboard &amp; mouse control of the target</div>
           </div>
-          <div class="hint">Full key handling &amp; on-screen keyboard live in the KVM console.</div>
+          <div class="btns" style="margin-top:12px">
+            <span class="chip" onclick="combo(['ControlLeft','AltLeft','Delete'])">Ctrl+Alt+Del</span>
+            <span class="chip" onclick="combo(['MetaLeft'])">Win</span>
+            <span class="chip" onclick="combo(['AltLeft','Tab'])">Alt+Tab</span>
+            <span class="chip" onclick="combo(['ControlLeft','AltLeft','F1'])">Ctrl+Alt+F1</span>
+            <span class="chip" onclick="combo(['Escape'])">Esc</span>
+            <span class="chip" onclick="combo(['PrintScreen'])">PrtSc</span>
+          </div>
         </div>
         <div class="card">
           <h3>Paste to target</h3>
-          <p class="sub">Type text onto the remote machine.</p>
+          <p class="sub">Type text straight onto the remote machine (via the USB keyboard).</p>
           <label class="f"><span>Text</span><input id="paste_txt" placeholder="type text to send…"></label>
           <div class="btns"><button class="btn" onclick="pasteText()">Send keystrokes</button></div>
+        </div>
+        <div class="card">
+          <h3>Stream</h3>
+          <div class="kv"><span class="k">Encoder</span><span class="v" id="strEnc">—</span></div>
+          <div class="kv"><span class="k">Resolution</span><span class="v" id="strRes">—</span></div>
+          <div class="kv"><span class="k">Live FPS</span><span class="v" id="strFps">—</span></div>
+          <div class="btns"><button class="btn ghost" onclick="kvmReloadStream()">Reload video</button></div>
         </div>
       </div>
     </section>
@@ -337,11 +354,72 @@ $$("#nav button").forEach(b=>b.onclick=()=>{
   ({network:loadNetwork,auto:loadAuto,system:loadSystem}[p]||(()=>{}))();
 });
 
-/* screen */
-function openConsole(){window.open("/","_blank");}
-function snapshot(){const v=$("#video");v.src=KVMD+"/streamer/snapshot?allow_offline=1&t="+Date.now();v.onload=()=>$("#videoPh").style.display="none";}
-async function combo(keys){toast("Combos are sent from the KVM console for now: "+keys);}
+/* ===== KVM core — live video + keyboard/mouse over kvmd's binary WebSocket =====
+   Protocol reused from PiKVM/kvmd (GPLv3): session.js / keyboard.js / mouse.js.
+   Key:   [0x01, state, ...ascii(code)]        (code = KeyboardEvent.code, e.g. "KeyA")
+   MBtn:  [0x02, state, ...ascii(button)]       (button = left/right/middle/up/down)
+   Move:  [0x03, xHi,xLo, yHi,yLo]              (x,y remapped to -32768..32767, big-endian)
+   Rel:   [0x04, squash, dx,dy,...]  Wheel: [0x05, squash, dx,dy]  (int8)
+   Ping:  [0x00]  → server pong [0xFF]. */
+let kvmWs=null,kvmCap=false,kvmAbs=true,kvmPing=null;const ENC=new TextEncoder();
+function wsUrl(){return (location.protocol==='https:'?'wss':'ws')+'://'+location.host+'/api/ws';}
+function kvmStreamSrc(){let p="/streamer/stream?key="+Math.random().toString(36).slice(2);
+  if(/chrome|chromium|edg|crios/i.test(navigator.userAgent))p+="&advance_headers=1";
+  else if(/safari|iphone|ipad/i.test(navigator.userAgent))p+="&dual_final_frames=1";return p;}
+function kvmReloadStream(){const v=$("#video");v.onload=()=>{$("#videoPh").style.display="none";};v.onerror=()=>{$("#videoPh").style.display="";};v.src=kvmStreamSrc();}
+function setLed(id,c){const el=$("#"+id);if(el)el.className="led"+(c?" "+c:"");}
+function kvmConnect(){
+  if(kvmWs)return;
+  try{kvmWs=new WebSocket(wsUrl());}catch(e){return;}
+  kvmWs.binaryType="arraybuffer";
+  kvmWs.onopen=()=>{setLed("ledLink","g");kvmPing=setInterval(()=>{try{kvmWs.send(new Uint8Array([0]));}catch(e){}},1000);};
+  kvmWs.onclose=()=>{setLed("ledLink","");clearInterval(kvmPing);kvmWs=null;setTimeout(kvmConnect,1500);};
+  kvmWs.onerror=()=>{try{kvmWs.close();}catch(e){}};
+  kvmWs.onmessage=(ev)=>{if(typeof ev.data==="string"){try{const m=JSON.parse(ev.data);kvmState(m.event_type,m.event);}catch(e){}}};
+}
+function kvmState(t,e){
+  if(t==="streamer"&&e){const s=e.state||{};const enc=s.encoder&&s.encoder.type;
+    if(enc)$("#strEnc").textContent=enc;
+    if(s.resolution)$("#strRes").textContent=s.resolution.width+"×"+s.resolution.height;
+    if(s.stream&&s.stream.clients_stat){const ids=Object.keys(s.stream.clients_stat);if(ids.length)$("#strFps").textContent=s.stream.clients_stat[ids[0]].fps+" fps";}}
+  if(t==="hid"&&e){const on=e.online&&!e.busy;setLed("ledKbd",kvmCap?(on?"g":"y"):"");setLed("ledMouse",kvmCap?(on?"g":"y"):"");}
+}
+/* --- senders (binary) --- */
+function wsReady(){return kvmWs&&kvmWs.readyState===1;}
+function sendKey(code,state){if(!wsReady())return;const b=ENC.encode("\x01\x00"+code);b[1]=state?1:0;kvmWs.send(b);}
+function sendBtn(btn,state){if(!wsReady())return;const b=ENC.encode("\x02\x00"+btn);b[1]=state?1:0;kvmWs.send(b);}
+function sendMove(x,y){if(!wsReady())return;kvmWs.send(new Uint8Array([3,(x>>8)&0xFF,x&0xFF,(y>>8)&0xFF,y&0xFF]));}
+function sendRel(dx,dy){if(!wsReady())return;kvmWs.send(new Int8Array([4,0,dx,dy]));}
+function sendWheel(dx,dy){if(!wsReady())return;kvmWs.send(new Int8Array([5,0,dx,dy]));}
+function remap(v,a,b,c,d){v=(v-a)/(b-a)*(d-c)+c;return Math.max(c,Math.min(d,Math.round(v)));}
+function imgGeo(){const img=$("#video"),r=img.getBoundingClientRect();
+  const nw=img.naturalWidth||16,nh=img.naturalHeight||9,er=r.width/r.height,ir=nw/nh;let w,h;
+  if(ir>er){w=r.width;h=r.width/ir;}else{h=r.height;w=r.height*ir;}
+  return{x:r.left+(r.width-w)/2,y:r.top+(r.height-h)/2,width:w,height:h};}
+const btnName=b=>({0:"left",2:"right",1:"middle",3:"up",4:"down"}[b]||"left");
+const clamp127=v=>Math.max(-127,Math.min(127,v|0));
+/* --- capture / controls --- */
+function kvmToggleCapture(){kvmCap=!kvmCap;const box=$("#streamBox"),btn=$("#capBtn");
+  btn.textContent=kvmCap?"Release":"Capture";btn.classList.toggle("ghost",kvmCap);box.classList.toggle("cap",kvmCap);
+  box.style.cursor=(kvmCap&&kvmAbs)?"crosshair":"default";
+  if(kvmCap){box.focus();setLed("ledKbd","g");setLed("ledMouse","g");if(!kvmAbs&&box.requestPointerLock)box.requestPointerLock();}
+  else{setLed("ledKbd","");setLed("ledMouse","");if(document.pointerLockElement)document.exitPointerLock();}}
+function kvmMouseMode(){kvmAbs=$("#mouseMode").value==="abs";if(kvmCap){$("#streamBox").style.cursor=kvmAbs?"crosshair":"default";if(!kvmAbs&&$("#streamBox").requestPointerLock)$("#streamBox").requestPointerLock();else if(document.pointerLockElement)document.exitPointerLock();}}
+function kvmFullscreen(){const b=$("#streamBox");(b.requestFullscreen||b.webkitRequestFullscreen||function(){}).call(b);}
+function combo(codes){codes.forEach(c=>sendKey(c,true));setTimeout(()=>codes.slice().reverse().forEach(c=>sendKey(c,false)),80);toast("Sent "+codes.join(" + "));}
 async function pasteText(){const t=$("#paste_txt").value;if(!t)return;const r=await fetch(KVMD+"/hid/print?limit=0",{method:"POST",credentials:"include",body:t});toast(r.ok?"Sent to target":"Send failed",r.ok?"ok":"bad");}
+/* --- wire input on the stream box --- */
+(function(){const box=$("#streamBox");if(!box)return;
+  box.addEventListener("contextmenu",e=>e.preventDefault());
+  box.addEventListener("mousedown",e=>{if(!kvmCap)return;e.preventDefault();box.focus();sendBtn(btnName(e.button),true);});
+  box.addEventListener("mouseup",e=>{if(!kvmCap)return;e.preventDefault();sendBtn(btnName(e.button),false);});
+  box.addEventListener("mousemove",e=>{if(!kvmCap)return;
+    if(kvmAbs){const g=imgGeo();sendMove(remap(e.clientX-g.x,0,g.width-1,-32768,32767),remap(e.clientY-g.y,0,g.height-1,-32768,32767));}
+    else if(document.pointerLockElement===box){sendRel(clamp127(e.movementX),clamp127(e.movementY));}});
+  box.addEventListener("wheel",e=>{if(!kvmCap)return;e.preventDefault();sendWheel(0,e.deltaY>0?-5:5);},{passive:false});
+  box.addEventListener("keydown",e=>{if(!kvmCap)return;e.preventDefault();if(!e.repeat)sendKey(e.code,true);});
+  box.addEventListener("keyup",e=>{if(!kvmCap)return;e.preventDefault();sendKey(e.code,false);});
+})();
 
 /* power & media */
 async function atx(a){const r=await jpost(KVMD+"/atx/power?action="+a);toast("Power: "+a,(r&&r.ok!==false)?"ok":"bad");setTimeout(refreshTop,800);}
@@ -392,7 +470,7 @@ async function refreshTop(){const r=await jget(KVMD+"/info");const d=res(r);cons
   $("#atx_led").textContent=on?"on":"off";$("#atx_hdd").textContent=(ad.leds&&ad.leds.hdd)?"active":"idle";}
 function fmtUp(s){if(!s)return "—";s=+s;const h=Math.floor(s/3600),m=Math.floor(s%3600/60);return h+"h "+m+"m";}
 
-snapshot();refreshTop();loadMsd();setInterval(refreshTop,5000);
+kvmReloadStream();kvmConnect();refreshTop();loadMsd();setInterval(refreshTop,5000);
 </script>
 </body>
 </html>
