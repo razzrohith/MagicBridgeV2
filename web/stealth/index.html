@@ -77,6 +77,19 @@ button.btn.ghost:hover{background:var(--surface3)}
   </div>
 
   <div class="grid">
+    <div class="card full" id="lockCard">
+      <h2>Stealth lock &nbsp;<span class="tag" id="lockState">—</span></h2>
+      <p class="sub">A password separate from the console login. Changing the USB identity the target trusts is gated behind it.</p>
+      <div class="row" id="unlockRow" style="display:none">
+        <label class="f"><span>Stealth password</span><input id="unlockPw" type="password" placeholder="enter to unlock" onkeydown="if(event.key==='Enter')doUnlock()"></label>
+        <button class="btn" style="align-self:flex-end" onclick="doUnlock()">Unlock</button>
+      </div>
+      <div class="row">
+        <label class="f"><span>New stealth password</span><input id="pwNew" type="password" placeholder="min 4 chars"></label>
+        <button class="btn ghost" style="align-self:flex-end" onclick="setStealthPw()">Save password</button>
+      </div>
+      <div class="hint">If a password is set, USB-identity actions require it. Forgot it? Clear <code>stealth_auth</code> via SSH.</div>
+    </div>
     <div class="card">
       <h2>USB identity</h2>
       <p class="sub">What the target PC sees the Pi as. Applying rebuilds the USB gadget (kvmd-otg) — briefly re-plugs the emulated device.</p>
@@ -149,6 +162,18 @@ async function jget(u){try{const r=await fetch(u,{credentials:"include"});return
 async function jpost(u,b){try{const r=await fetch(u,{method:"POST",credentials:"include",headers:{"content-type":"application/json"},body:b?JSON.stringify(b):null});return await r.json();}catch(e){return {ok:false,error:String(e)};}}
 let PRESETS={};
 const toHex=n=>n?("0x"+Number(n).toString(16).toUpperCase()):"";
+/* --- separate stealth password gate --- */
+let STEALTH_PW="",PW_SET=false;
+async function checkLock(){const r=await jget(MB+"/stealth/lock-status");PW_SET=!!(r&&r.password_set);
+  $("#unlockRow").style.display=(PW_SET&&!STEALTH_PW)?"":"none";
+  const el=$("#lockState");el.textContent=PW_SET?(STEALTH_PW?"unlocked":"locked"):"no password";
+  el.className="tag "+(PW_SET?(STEALTH_PW?"ok":"no"):"");}
+async function doUnlock(){const pw=$("#unlockPw").value;const r=await jpost(MB+"/stealth/unlock",{password:pw});
+  if(r&&r.ok){STEALTH_PW=pw;$("#unlockPw").value="";toast("Unlocked","ok");checkLock();}else toast("Wrong stealth password","bad");}
+async function setStealthPw(){const nw=$("#pwNew").value;if(nw.length<4)return toast("Password too short (min 4)","bad");
+  const r=await jpost(MB+"/stealth/password",{password:nw,current:STEALTH_PW});
+  toast(r&&r.ok?"Stealth password saved":("Failed: "+((r&&r.error)||"error")),r&&r.ok?"ok":"bad");
+  if(r&&r.ok){STEALTH_PW=nw;$("#pwNew").value="";checkLock();}}
 
 async function loadIdentity(){
   const r=await jget(MB+"/stealth/identity");if(!r)return;
@@ -169,16 +194,17 @@ function selectPreset(k){document.querySelectorAll(".preset").forEach(x=>x.class
   const v=PRESETS[k];if(!v)return;$("#vid").value=toHex(v.vendor_id);$("#pid").value=toHex(v.product_id);$("#mfr").value=v.manufacturer||"";$("#prod").value=v.product||"";
   $("#verifyNote").textContent=v.verified?"":"⚠ This preset is researched but not hardware-verified against a real device descriptor.";}
 function selectedPreset(){const el=document.querySelector(".preset.sel");return el?el.dataset.k:null;}
+function pwGuard(r){if(r&&r.locked){toast("Locked — enter the stealth password first","bad");checkLock();return true;}return false;}
 async function applyIdentity(){toast("Applying identity — rebuilding gadget…");
-  const r=await jpost(MB+"/stealth/identity",{preset:selectedPreset(),serial:$("#serial").value||null,vendor_id:$("#vid").value,product_id:$("#pid").value,manufacturer:$("#mfr").value,product:$("#prod").value});
-  toast(r.ok?"Identity applied":("Apply failed: "+(r.error||r.detail||"error")),r.ok?"ok":"bad");loadIdentity();loadStatus();}
-async function randSerial(){const r=await jpost(MB+"/stealth/serial/random");toast(r.ok?("Serial → "+r.serial):"Failed",r.ok?"ok":"bad");loadIdentity();}
-async function setSafe(){const on=$("#safe").value==="true";await jpost(MB+"/stealth/safe-mode",{on});toast("Safe mode "+(on?"enabled":"disabled"),"ok");}
+  const r=await jpost(MB+"/stealth/identity",{preset:selectedPreset(),serial:$("#serial").value||null,vendor_id:$("#vid").value,product_id:$("#pid").value,manufacturer:$("#mfr").value,product:$("#prod").value,password:STEALTH_PW});
+  if(pwGuard(r))return;toast(r.ok?"Identity applied":("Apply failed: "+(r.error||r.detail||"error")),r.ok?"ok":"bad");loadIdentity();loadStatus();}
+async function randSerial(){const r=await jpost(MB+"/stealth/serial/random",{password:STEALTH_PW});if(pwGuard(r))return;toast(r.ok?("Serial → "+r.serial):"Failed",r.ok?"ok":"bad");loadIdentity();}
+async function setSafe(){const on=$("#safe").value==="true";const r=await jpost(MB+"/stealth/safe-mode",{on,password:STEALTH_PW});if(pwGuard(r))return;toast("Safe mode "+(on?"enabled":"disabled"),"ok");}
 async function macApply(random){const r=await jpost(MB+"/net/mac",{iface:$("#macIf").value,mac:$("#macVal").value,random});
   toast(r.ok?("MAC → "+r.mac):("MAC failed: "+(r.detail||r.error||"")),r.ok?"ok":"bad");$("#macCur").textContent=r.mac||"—";}
 async function loadStatus(){const s=await jget(MB+"/stealth/status");if(s){$("#stOtg").textContent=s.kvmd_otg||"—";$("#stOv").textContent=s.override_present?"yes":"no";}
   const n=await jget(MB+"/net/status");if(n){$("#stTs").textContent=n.tailscale&&n.tailscale.up?"up":"down";if(n.mac&&n.mac.mac)$("#macCur").textContent=n.mac.mac;}}
-loadIdentity();loadStatus();
+loadIdentity();loadStatus();checkLock();
 </script>
 </body>
 </html>

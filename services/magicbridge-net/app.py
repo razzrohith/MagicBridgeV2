@@ -233,6 +233,143 @@ async def logs_tail(request):
     return web.json_response({"ok": rc == 0, "unit": unit or "all", "text": out[-8000:]})
 
 
+def _rw():
+    sh("bash", "-c", "command -v rw >/dev/null && rw || mount -o remount,rw /")
+
+
+def _ro():
+    sh("bash", "-c", "command -v ro >/dev/null && ro || true")
+
+
+# ---- EDID editor (kvmd-edidconf) -----------------------------------
+async def edid_get(_):
+    import re
+    _rc, help_txt = sh("kvmd-edidconf", "--help", timeout=10)
+    m = re.search(r"--import-preset \{([^}]+)\}", help_txt)
+    presets = [p.strip() for p in m.group(1).split("|")] if m else []
+    _rc, cur = sh("kvmd-edidconf", timeout=10)
+    return web.json_response({"ok": True, "presets": presets, "current": cur[-2000:]})
+
+
+async def edid_apply(request):
+    body = await request.json()
+    preset = body.get("preset", "")
+    if not preset:
+        return web.json_response({"ok": False, "error": "preset required"}, status=400)
+    _rw()
+    try:
+        rc, out = sh("kvmd-edidconf", "--import-preset", preset, "--apply", timeout=40)
+    finally:
+        _ro()
+    return web.json_response({"ok": rc == 0, "preset": preset, "detail": out[-1500:]})
+
+
+# ---- VNC (kvmd-vnc) ------------------------------------------------
+async def vnc_get(_):
+    _rc, active = sh("systemctl", "is-active", "kvmd-vnc")
+    _rc, enabled = sh("systemctl", "is-enabled", "kvmd-vnc")
+    return web.json_response({"ok": True, "active": active.strip() == "active",
+                              "enabled": "enabled" in enabled, "port": 5900})
+
+
+async def vnc_set(request):
+    body = await request.json()
+    on = bool(body.get("on"))
+    if on:
+        rc, out = sh("systemctl", "enable", "--now", "kvmd-vnc", timeout=25)
+    else:
+        rc, out = sh("systemctl", "disable", "--now", "kvmd-vnc", timeout=25)
+    return web.json_response({"ok": rc == 0, "on": on, "detail": out[-800:]})
+
+
+# ---- 2FA / TOTP (standard RFC-6238, no external deps) --------------
+TOTP_SECRET = "/etc/kvmd/totp.secret"
+
+
+def _totp(secret_b32, when=None, step=30, digits=6):
+    import base64, hmac, struct, time as _t
+    pad = "=" * ((8 - len(secret_b32) % 8) % 8)
+    key = base64.b32decode(secret_b32.upper() + pad)
+    counter = struct.pack(">Q", int((when or _t.time()) // step))
+    dig = hmac.new(key, counter, "sha1").digest()
+    off = dig[-1] & 0x0F
+    code = (struct.unpack(">I", dig[off:off + 4])[0] & 0x7FFFFFFF) % (10 ** digits)
+    return str(code).zfill(digits)
+
+
+async def totp_status(_):
+    try:
+        sec = open(TOTP_SECRET).read().strip()
+    except Exception:
+        sec = ""
+    return web.json_response({"ok": True, "enabled": bool(sec)})
+
+
+async def totp_generate(_):
+    import base64, secrets
+    sec = base64.b32encode(secrets.token_bytes(20)).decode().rstrip("=")
+    uri = "otpauth://totp/MagicBridgeV2:admin?secret=%s&issuer=MagicBridgeV2" % sec
+    return web.json_response({"ok": True, "secret": sec, "uri": uri})
+
+
+async def totp_enable(request):
+    import time as _t
+    body = await request.json()
+    sec = (body.get("secret") or "").strip().replace(" ", "")
+    code = str(body.get("code") or "").strip()
+    if not sec or not code:
+        return web.json_response({"ok": False, "error": "secret and code required"}, status=400)
+    # Verify the user's authenticator matches BEFORE writing, so we never lock them out.
+    if not any(_totp(sec, _t.time() + off) == code for off in (-30, 0, 30)):
+        return web.json_response({"ok": False, "error": "code didn't match — re-check your authenticator app"}, status=400)
+    _rw()
+    try:
+        with open(TOTP_SECRET, "w") as f:
+            f.write(sec + "\n")
+        sh("chown", "kvmd:kvmd", TOTP_SECRET)
+        sh("chmod", "600", TOTP_SECRET)
+    finally:
+        _ro()
+    return web.json_response({"ok": True, "enabled": True})
+
+
+async def totp_disable(_):
+    _rw()
+    try:
+        open(TOTP_SECRET, "w").close()
+    finally:
+        _ro()
+    return web.json_response({"ok": True, "enabled": False})
+
+
+# ---- Tailscale install + Funnel ------------------------------------
+async def tailscale_install(_):
+    if sh("command", "-v", "tailscale")[0] == 0 or sh("bash", "-c", "command -v tailscale")[0] == 0:
+        return web.json_response({"ok": True, "already": True, "detail": "tailscale already installed"})
+    rc, out = sh("bash", "-c", "pacman -Sy --noconfirm tailscale 2>&1", timeout=120)
+    if rc != 0:
+        rc, out = sh("bash", "-c", "curl -fsSL https://tailscale.com/install.sh | sh 2>&1", timeout=180)
+    sh("systemctl", "enable", "--now", "tailscaled", timeout=20)
+    ok = sh("bash", "-c", "command -v tailscale")[0] == 0
+    return web.json_response({"ok": ok, "detail": out[-1800:]})
+
+
+async def tailscale_funnel(request):
+    body = await request.json()
+    on = bool(body.get("on", True))
+    if sh("bash", "-c", "command -v tailscale")[0] != 0:
+        return web.json_response({"ok": False, "error": "tailscale not installed — run install first"}, status=400)
+    if on:
+        rc, out = sh("tailscale", "funnel", "--bg", "443", timeout=30)
+        if rc != 0:
+            rc, out = sh("tailscale", "funnel", "443", "on", timeout=30)
+    else:
+        rc, out = sh("tailscale", "funnel", "--https=443", "off", timeout=30)
+        if rc != 0:
+            rc, out = sh("tailscale", "funnel", "443", "off", timeout=30)
+    return web.json_response({"ok": rc == 0, "on": on, "detail": out[-1500:]})
+
+
 def build_app():
     app = web.Application()
     app.add_routes([
@@ -247,6 +384,16 @@ def build_app():
         web.get("/wifi/scan", wifi_scan),
         web.get("/update", update_check),
         web.get("/logs", logs_tail),
+        web.get("/edid", edid_get),
+        web.post("/edid", edid_apply),
+        web.get("/vnc", vnc_get),
+        web.post("/vnc", vnc_set),
+        web.get("/totp", totp_status),
+        web.post("/totp/generate", totp_generate),
+        web.post("/totp/enable", totp_enable),
+        web.post("/totp/disable", totp_disable),
+        web.post("/tailscale/install", tailscale_install),
+        web.post("/tailscale/funnel", tailscale_funnel),
     ])
     return app
 

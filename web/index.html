@@ -103,6 +103,14 @@ button.btn.danger:hover{background:rgba(229,83,75,.1)}
 .chip{background:var(--surface3);border:1px solid var(--border2);border-radius:7px;padding:7px 11px;font-size:12.5px;cursor:pointer;color:var(--text)}
 .chip:hover{border-color:var(--accent);color:var(--accent)}
 .switch{display:flex;align-items:center;gap:10px}
+.osk{margin-top:14px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:10px;user-select:none}
+.osk .krow{display:flex;gap:5px;margin-bottom:5px}.osk .krow:last-child{margin-bottom:0}
+.osk .key{flex:1;min-width:0;text-align:center;background:var(--surface3);border:1px solid var(--border2);border-radius:6px;
+  padding:9px 0;font-size:12px;cursor:pointer;color:var(--text);white-space:nowrap}
+.osk .key:hover{border-color:var(--accent);color:var(--accent)}
+.osk .key:active{background:var(--accent);color:#fff}
+.osk .key.mod.on{background:var(--accent);color:#fff;border-color:var(--accent)}
+.osk .key.w15{flex:1.5}.osk .key.w20{flex:2}.osk .key.w60{flex:6}
 
 #toast{position:fixed;right:20px;bottom:20px;display:flex;flex-direction:column;gap:9px;z-index:60}
 .t{background:var(--surface2);border:1px solid var(--border2);border-left:3px solid var(--accent);padding:11px 15px;border-radius:9px;
@@ -159,11 +167,15 @@ button.btn.danger:hover{background:rgba(229,83,75,.1)}
               <button class="btn" id="capBtn" onclick="kvmToggleCapture()">Capture</button>
               <select id="mouseMode" onchange="kvmSetMouseMode()" style="width:auto">
                 <option value="usb">Absolute mouse</option><option value="usb_rel">Relative mouse</option></select>
+              <select id="transport" onchange="setTransport()" style="width:auto" title="Video transport">
+                <option value="mjpeg">MJPEG</option><option value="webrtc">WebRTC · H.264</option></select>
+              <button class="btn ghost" id="oskBtn" onclick="toggleOsk()">Keyboard</button>
               <button class="btn ghost" onclick="kvmFullscreen()">Fullscreen</button>
             </div>
           </div>
           <div class="screen" id="streamBox" tabindex="0">
             <img id="video" alt="">
+            <video id="videoRtc" playsinline autoplay muted style="display:none;width:100%;height:100%;object-fit:contain"></video>
             <div class="ph" id="videoPh">Click <b>Capture</b> to take keyboard &amp; mouse control of the target</div>
           </div>
           <div class="btns" style="margin-top:12px">
@@ -173,7 +185,9 @@ button.btn.danger:hover{background:rgba(229,83,75,.1)}
             <span class="chip" onclick="combo(['ControlLeft','AltLeft','F1'])">Ctrl+Alt+F1</span>
             <span class="chip" onclick="combo(['Escape'])">Esc</span>
             <span class="chip" onclick="combo(['PrintScreen'])">PrtSc</span>
+            <span class="chip" onclick="pasteClipboard()">Paste clipboard →</span>
           </div>
+          <div id="osk" class="osk" style="display:none"></div>
         </div>
         <div class="card">
           <h3>Paste to target</h3>
@@ -272,12 +286,18 @@ button.btn.danger:hover{background:rgba(229,83,75,.1)}
           <div class="btns">
             <button class="btn" onclick="tailscale('up')">Bring up</button>
             <button class="btn ghost" onclick="tailscale('down')">Down</button>
+            <button class="btn ghost" onclick="tsInstall()">Install</button>
           </div>
-          <div class="btns">
+          <div class="sec-title" style="margin-top:14px">Public HTTPS (Funnel)</div>
+          <div class="btns" style="margin-top:0">
+            <button class="btn" onclick="tsFunnel(true)">Funnel on</button>
+            <button class="btn ghost" onclick="tsFunnel(false)">Funnel off</button>
+          </div>
+          <div class="btns" style="margin-top:14px">
             <button class="btn warn" onclick="lockdown(true)">Lockdown on</button>
             <button class="btn ghost" onclick="lockdown(false)">Lockdown off</button>
           </div>
-          <div class="hint">Lockdown limits the web UI to Tailscale only. SSH is never restricted.</div>
+          <div class="hint">Funnel exposes the UI on a public Tailscale HTTPS URL. Lockdown limits the web UI to Tailscale only. SSH is never restricted.</div>
         </div>
         <div class="card">
           <h3>Dynamic DNS (DuckDNS)</h3>
@@ -346,7 +366,31 @@ button.btn.danger:hover{background:rgba(229,83,75,.1)}
           </div>
           <div class="kv" style="margin-top:14px"><span class="k">Update</span><span class="v" id="upd_state">—</span></div>
           <div class="kv"><span class="k">OLED display</span><span class="v"><span class="tag ok">native</span></span></div>
-          <div class="kv"><span class="k">EDID spoofing</span><span class="v"><span class="tag ok">native</span></span></div>
+        </div>
+        <div class="card">
+          <h3>Display / EDID</h3>
+          <p class="sub">What the target thinks it's plugged into. Presets change the resolutions offered to it.</p>
+          <label class="f"><span>EDID preset</span><select id="edid_preset"></select></label>
+          <div class="btns"><button class="btn" onclick="edidApply()">Apply preset</button>
+            <button class="btn ghost" onclick="loadEdid()">Refresh</button></div>
+          <pre id="edid_cur" style="margin:12px 0 0;max-height:130px;overflow:auto;background:var(--surface3);border:1px solid var(--border);border-radius:8px;padding:10px;font-size:11px;color:var(--text2);white-space:pre-wrap">—</pre>
+        </div>
+        <div class="card">
+          <h3>Remote access &amp; 2FA</h3>
+          <p class="sub">Optional VNC client access and two-factor login.</p>
+          <div class="kv"><span class="k">VNC server (:5900)</span><span class="v" id="vnc_state">—</span></div>
+          <div class="btns"><button class="btn" onclick="vncSet(true)">Enable VNC</button>
+            <button class="btn ghost" onclick="vncSet(false)">Disable</button></div>
+          <div class="sec-title" style="margin-top:16px">Two-factor (TOTP)</div>
+          <div class="kv"><span class="k">Status</span><span class="v" id="totp_state">—</span></div>
+          <div id="totp_setup" style="display:none;margin-top:10px">
+            <div class="kv"><span class="k">Secret</span><span class="v" id="totp_secret" style="font-size:11px;word-break:break-all">—</span></div>
+            <label class="f" style="margin-top:8px"><span>6-digit code from your app</span><input id="totp_code" placeholder="123456" inputmode="numeric"></label>
+            <div class="btns"><button class="btn" onclick="totpEnable()">Verify &amp; enable</button></div>
+            <div class="hint">Add the secret to Google Authenticator/Authy, enter the current code, then enable. SSH can always clear 2FA if you get locked out.</div>
+          </div>
+          <div class="btns" style="margin-top:10px"><button class="btn ghost" onclick="totpGenerate()">Set up 2FA</button>
+            <button class="btn danger" onclick="totpDisable()">Disable 2FA</button></div>
         </div>
         <div class="card">
           <h3>Logs</h3>
@@ -362,6 +406,7 @@ button.btn.danger:hover{background:rgba(229,83,75,.1)}
 </div>
 <div id="toast"></div>
 
+<script src="janus.js"></script>
 <script>
 const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
 const KVMD="/api", MB="/mb";
@@ -376,7 +421,7 @@ $$("#nav button").forEach(b=>b.onclick=()=>{
   $$("#nav button").forEach(x=>x.classList.toggle("active",x===b));
   const p=b.dataset.p;$$(".page").forEach(x=>x.classList.toggle("active",x.dataset.page===p));
   $("#ptitle").textContent=titles[p];
-  ({screen:loadStreamCtl,power:()=>{loadMsd();loadGpio();},network:loadNetwork,auto:loadAuto,system:loadSystem}[p]||(()=>{}))();
+  ({screen:loadStreamCtl,power:()=>{loadMsd();loadGpio();},network:loadNetwork,auto:loadAuto,system:()=>{loadSystem();loadEdid();loadVnc();loadTotp();}}[p]||(()=>{}))();
 });
 
 /* ===== KVM core — live video + keyboard/mouse over kvmd's binary WebSocket =====
@@ -387,11 +432,60 @@ $$("#nav button").forEach(b=>b.onclick=()=>{
    Rel:   [0x04, squash, dx,dy,...]  Wheel: [0x05, squash, dx,dy]  (int8)
    Ping:  [0x00]  → server pong [0xFF]. */
 let kvmWs=null,kvmCap=false,kvmAbs=true,kvmPing=null;const ENC=new TextEncoder();
+let transport="mjpeg",janusStreamer=null,webrtcUp=false;
 function wsUrl(){return (location.protocol==='https:'?'wss':'ws')+'://'+location.host+'/api/ws';}
 function kvmStreamSrc(){let p="/streamer/stream?key="+Math.random().toString(36).slice(2);
   if(/chrome|chromium|edg|crios/i.test(navigator.userAgent))p+="&advance_headers=1";
   else if(/safari|iphone|ipad/i.test(navigator.userAgent))p+="&dual_final_frames=1";return p;}
 function kvmReloadStream(){const v=$("#video");v.onload=()=>{$("#videoPh").style.display="none";};v.onerror=()=>{$("#videoPh").style.display="";};v.src=kvmStreamSrc();}
+/* ===== WebRTC (H.264) transport — reuses PiKVM's janus.plugin.ustreamer (GPLv3),
+   ported from kvmd stream_janus.js. Opt-in; auto-falls back to MJPEG on failure. ===== */
+function janusWsUrl(){return (location.protocol==='https:'?'wss':'ws')+'://'+location.host+'/janus/ws';}
+function JanusStreamer(videoEl,onActive,onInfo){
+  let stop=false,janus=null,handle=null,retry=null;
+  this.start=function(){stop=false;ensure();};
+  this.stop=function(){stop=true;destroy();};
+  function ensure(){if(janus||stop||!window.Janus)return;
+    janus=new window.Janus({server:janusWsUrl(),ipv6:false,destroyOnUnload:false,iceServers:[],
+      success:attach,error:function(e){onInfo("janus: "+e);finish();}});}
+  function finish(){if(handle){try{handle.detach();}catch(e){}handle=null;}janus=null;
+    if(!stop&&retry===null){retry=setTimeout(function(){retry=null;ensure();},1500);}}
+  function destroy(){if(retry){clearTimeout(retry);retry=null;}if(janus){try{janus.destroy();}catch(e){}}
+    const s=videoEl.srcObject;if(s){s.getTracks().forEach(t=>{try{t.stop();}catch(e){}});videoEl.srcObject=null;}handle=null;janus=null;}
+  function attach(){janus.attach({plugin:"janus.plugin.ustreamer",opaqueId:"mb-"+window.Janus.randomString(12),
+    success:function(h){handle=h;h.send({message:{request:"features"}});},
+    error:function(e){onInfo("attach failed");destroy();},
+    connectionState:function(st){if(st==="failed")destroy();},
+    onmessage:function(msg,jsep){
+      if(msg&&msg.result&&msg.result.status==="features"){
+        handle.send({message:{request:"watch",params:{orientation:0,audio:false,mic:false,camera:false}}});}
+      if(jsep){handle.createAnswer({jsep:jsep,tracks:[{type:"video",recv:true,add:true}],
+        success:function(ans){handle.send({message:{request:"start"},jsep:ans});},
+        error:function(e){onInfo("SDP error");destroy();}});}},
+    onremotetrack:function(track,mid,added,meta){const reason=(meta||{}).reason;
+      if(added&&reason==="created"){if(!videoEl.srcObject)videoEl.srcObject=new MediaStream();
+        videoEl.srcObject.addTrack(track);if(track.kind==="video")onActive();}
+      else if(!added&&reason==="ended"){if(videoEl.srcObject){try{videoEl.srcObject.removeTrack(track);}catch(e){}}}},
+  });}
+}
+function ensureJanusInit(cb){if(!window.Janus)return cb(false);
+  if(window.Janus.isWebrtcSupported&&window.Janus.isWebrtcSupported()===false)return cb(false);
+  if(window.__janusInited)return cb(true);
+  window.Janus.init({debug:false,callback:function(){window.__janusInited=true;cb(true);}});}
+function setTransport(){const t=$("#transport").value;if(t===transport)return;
+  if(t==="webrtc"){
+    if(!window.Janus||!window.RTCPeerConnection){toast("WebRTC not available in this browser","bad");$("#transport").value="mjpeg";return;}
+    startWebrtc();
+  }else{stopWebrtc();}}
+function startWebrtc(){transport="webrtc";webrtcUp=false;
+  $("#video").style.display="none";$("#videoRtc").style.display="";$("#videoPh").style.display="none";
+  toast("Starting WebRTC H.264…");
+  const fail=setTimeout(function(){if(!webrtcUp){toast("WebRTC didn't start — back to MJPEG","bad");$("#transport").value="mjpeg";stopWebrtc();}},9000);
+  ensureJanusInit(function(ok){if(!ok){clearTimeout(fail);toast("WebRTC unavailable — using MJPEG","bad");$("#transport").value="mjpeg";stopWebrtc();return;}
+    janusStreamer=new JanusStreamer($("#videoRtc"),function(){webrtcUp=true;clearTimeout(fail);$("#strEnc").textContent="H.264 (WebRTC)";toast("WebRTC H.264 live","ok");},function(i){});
+    janusStreamer.start();});}
+function stopWebrtc(){transport="mjpeg";if(janusStreamer){janusStreamer.stop();janusStreamer=null;}
+  $("#videoRtc").style.display="none";$("#video").style.display="";kvmReloadStream();}
 function setLed(id,c){const el=$("#"+id);if(el)el.className="led"+(c?" "+c:"");}
 function kvmConnect(){
   if(kvmWs)return;
@@ -419,8 +513,9 @@ function sendMove(x,y){if(!wsReady())return;kvmWs.send(new Uint8Array([3,(x>>8)&
 function sendRel(dx,dy){if(!wsReady())return;kvmWs.send(new Int8Array([4,0,dx,dy]));}
 function sendWheel(dx,dy){if(!wsReady())return;kvmWs.send(new Int8Array([5,0,dx,dy]));}
 function remap(v,a,b,c,d){v=(v-a)/(b-a)*(d-c)+c;return Math.max(c,Math.min(d,Math.round(v)));}
-function imgGeo(){const img=$("#video"),r=img.getBoundingClientRect();
-  const nw=img.naturalWidth||16,nh=img.naturalHeight||9,er=r.width/r.height,ir=nw/nh;let w,h;
+function activeVideoEl(){return transport==="webrtc"?$("#videoRtc"):$("#video");}
+function imgGeo(){const el=activeVideoEl(),r=el.getBoundingClientRect();
+  const nw=el.naturalWidth||el.videoWidth||16,nh=el.naturalHeight||el.videoHeight||9,er=r.width/r.height,ir=nw/nh;let w,h;
   if(ir>er){w=r.width;h=r.width/ir;}else{h=r.height;w=r.height*ir;}
   return{x:r.left+(r.width-w)/2,y:r.top+(r.height-h)/2,width:w,height:h};}
 const btnName=b=>({0:"left",2:"right",1:"middle",3:"up",4:"down"}[b]||"left");
@@ -446,6 +541,32 @@ async function kvmSetMouseMode(){const out=$("#mouseMode").value;kvmModeBusy=tru
 function kvmFullscreen(){const b=$("#streamBox");(b.requestFullscreen||b.webkitRequestFullscreen||function(){}).call(b);}
 function combo(codes){codes.forEach(c=>sendKey(c,true));setTimeout(()=>codes.slice().reverse().forEach(c=>sendKey(c,false)),80);toast("Sent "+codes.join(" + "));}
 async function pasteText(){const t=$("#paste_txt").value;if(!t)return;const r=await fetch(KVMD+"/hid/print?limit=0",{method:"POST",credentials:"include",body:t});toast(r.ok?"Sent to target":"Send failed",r.ok?"ok":"bad");}
+async function pasteClipboard(){try{const t=await navigator.clipboard.readText();if(!t)return toast("Clipboard is empty");
+  const r=await fetch(KVMD+"/hid/print?limit=0",{method:"POST",credentials:"include",body:t});
+  toast(r.ok?("Pasted "+t.length+" chars to target"):"Paste failed",r.ok?"ok":"bad");}
+  catch(e){toast("Clipboard blocked — click the page once, then retry","bad");}}
+/* --- on-screen keyboard: sends keys over the kvmd WS without capturing your real keyboard --- */
+const OSK_MODS=new Set();
+function oskLayout(){const F=[];for(let i=1;i<=12;i++)F.push(["F"+i,"F"+i]);
+  const dig=["1","2","3","4","5","6","7","8","9","0"];const L=s=>s.split("").map(c=>[c,"Key"+c.toUpperCase()]);
+  return [
+    [["Esc","Escape"],...F],
+    [["`","Backquote"],...dig.map(d=>[d,"Digit"+d]),["-","Minus"],["=","Equal"],["⌫","Backspace","w20"]],
+    [["Tab","Tab","w15"],...L("qwertyuiop"),["[","BracketLeft"],["]","BracketRight"],["\\","Backslash"]],
+    [["Caps","CapsLock","w15 mod"],...L("asdfghjkl"),[";","Semicolon"],["'","Quote"],["Enter","Enter","w15"]],
+    [["Shift","ShiftLeft","w20 mod"],...L("zxcvbnm"),[",","Comma"],[".","Period"],["/","Slash"],["Shift","ShiftRight","w20 mod"]],
+    [["Ctrl","ControlLeft","mod"],["Win","MetaLeft","mod"],["Alt","AltLeft","mod"],["Space","Space","w60"],["Alt","AltRight","mod"],["Ctrl","ControlRight","mod"],["←","ArrowLeft"],["↑","ArrowUp"],["↓","ArrowDown"],["→","ArrowRight"]],
+  ];}
+function buildOsk(){const box=$("#osk");if(box.dataset.built)return;box.dataset.built=1;
+  oskLayout().forEach(row=>{const rd=document.createElement("div");rd.className="krow";
+    row.forEach(([label,code,cls])=>{const k=document.createElement("div");k.className="key "+(cls||"");k.textContent=label;
+      k.dataset.code=code;k.onclick=()=>oskPress(code,k);rd.appendChild(k);});box.appendChild(rd);});}
+function oskPress(code,el){
+  if(el.classList.contains("mod")){el.classList.toggle("on");OSK_MODS.has(code)?OSK_MODS.delete(code):OSK_MODS.add(code);return;}
+  const mods=[...OSK_MODS];mods.forEach(m=>sendKey(m,true));sendKey(code,true);sendKey(code,false);
+  mods.slice().reverse().forEach(m=>sendKey(m,false));
+  OSK_MODS.clear();$$("#osk .key.mod.on").forEach(x=>x.classList.remove("on"));}
+function toggleOsk(){const box=$("#osk");buildOsk();const show=box.style.display==="none";box.style.display=show?"":"none";toast(show?"On-screen keyboard — keys go straight to the target":"");}
 /* --- wire input on the stream box --- */
 (function(){const box=$("#streamBox");if(!box)return;
   box.addEventListener("contextmenu",e=>e.preventDefault());
@@ -521,6 +642,8 @@ async function wifiScan(){$("#wifi_scan").textContent="Scanning…";const r=awai
   $("#wifi_nets").innerHTML=r.networks.map(n=>`<option value="${n.ssid}">`).join("");
   $("#wifi_scan").innerHTML=r.networks.length?("Found: "+r.networks.map(n=>n.ssid+(n.secure?" 🔒":"")).join(", ")):"No networks found";}
 async function tailscale(a){const r=await jpost(MB+"/net/tailscale",{action:a});toast("Tailscale "+a,(r&&r.ok)?"ok":"");loadNetwork();}
+async function tsInstall(){toast("Installing Tailscale… (may take a minute)");const r=await jpost(MB+"/net/tailscale/install");toast(r&&r.ok?(r.already?"Already installed":"Tailscale installed"):"Install failed — see logs",r&&r.ok?"ok":"bad");}
+async function tsFunnel(on){toast("Configuring Funnel…");const r=await jpost(MB+"/net/tailscale/funnel",{on});toast(r&&r.ok?("Funnel "+(on?"on":"off")):"Funnel: "+((r&&(r.error||r.detail))||"failed"),r&&r.ok?"ok":"bad");}
 async function lockdown(on){const r=await jpost(MB+"/net/lockdown",{on});toast("Lockdown "+(on?"on":"off"),(r&&r.ok)?"ok":"");}
 async function duckdns(){const r=await jpost(MB+"/net/duckdns",{domain:$("#dd_domain").value,token:$("#dd_token").value});toast(r.ok?"DuckDNS updated":"DuckDNS: "+(r.error||"error"),r.ok?"ok":"bad");loadNetwork();}
 
@@ -549,6 +672,25 @@ async function checkUpdate(){$("#upd_state").textContent="checking…";const r=a
 async function power(a){if(!confirm("Really "+a+" the device?"))return;await jpost(KVMD+"/"+(a==="reboot"?"reboot":"shutdown"));toast("Sent "+a);}
 async function loadLogs(){$("#logbox").textContent="loading…";const r=await jget(MB+"/net/logs?n=120");
   $("#logbox").textContent=(r&&r.text)?r.text:"No logs returned (journald may be restricted).";}
+/* EDID / VNC / 2FA */
+async function loadEdid(){const r=await jget(MB+"/net/edid");if(!r)return;const sel=$("#edid_preset");
+  if(r.presets&&r.presets.length&&sel.options.length<=0){sel.innerHTML=r.presets.map(p=>`<option value="${p}">${p}</option>`).join("");
+    if(r.presets.includes("v4mini"))sel.value="v4mini";}
+  $("#edid_cur").textContent=r.current||"—";}
+async function edidApply(){const p=$("#edid_preset").value;if(!p)return;if(!confirm("Apply EDID preset '"+p+"'? The captured video will blink for a moment."))return;
+  toast("Applying EDID preset…");const r=await jpost(MB+"/net/edid",{preset:p});
+  toast(r&&r.ok?"EDID preset applied":"EDID failed",r&&r.ok?"ok":"bad");setTimeout(loadEdid,1800);}
+async function loadVnc(){const r=await jget(MB+"/net/vnc");$("#vnc_state").innerHTML=(r&&r.active)?'<span class="tag ok">running</span>':'<span class="tag">off</span>';}
+async function vncSet(on){const r=await jpost(MB+"/net/vnc",{on});toast(r&&r.ok?("VNC "+(on?"enabled":"disabled")):"VNC change failed",r&&r.ok?"ok":"bad");setTimeout(loadVnc,900);}
+async function loadTotp(){const r=await jget(MB+"/net/totp");$("#totp_state").innerHTML=(r&&r.enabled)?'<span class="tag ok">enabled</span>':'<span class="tag warn">disabled</span>';}
+async function totpGenerate(){const r=await jpost(MB+"/net/totp/generate");if(!r||!r.ok)return toast("Couldn't generate secret","bad");
+  $("#totp_secret").textContent=r.secret;$("#totp_setup").style.display="";$("#totp_setup").dataset.secret=r.secret;
+  toast("Add the secret to your authenticator app, then enter the code");}
+async function totpEnable(){const sec=$("#totp_setup").dataset.secret,code=$("#totp_code").value.trim();
+  const r=await jpost(MB+"/net/totp/enable",{secret:sec,code});
+  toast(r&&r.ok?"2FA enabled":"2FA: "+((r&&r.error)||"failed"),r&&r.ok?"ok":"bad");
+  if(r&&r.ok){$("#totp_setup").style.display="none";$("#totp_code").value="";loadTotp();}}
+async function totpDisable(){if(!confirm("Disable two-factor login?"))return;const r=await jpost(MB+"/net/totp/disable");toast(r&&r.ok?"2FA disabled":"failed",r&&r.ok?"ok":"bad");loadTotp();}
 
 /* top bar */
 async function refreshTop(){const r=await jget(KVMD+"/info");const d=res(r);const hw=d.hw||{};

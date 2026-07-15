@@ -17,9 +17,11 @@ BASE = os.path.dirname(os.path.abspath(__file__))
 LOG = os.path.join(BASE, "sync_and_push_log.txt")
 PROJ = r"C:\Users\razzr\Claude\Projects\MagicBridge\MagicBridgeV2"
 EDEV = r"E:\Startup\MagicbridgeV2"
-# session-only artifacts we never want in git
-EXCLUDE_FILES = ["*_log.txt", "inspect_git.py", "fix_perms.py", "fix_meta.py",
-                 "check_kvmd.py", "deploy_nginx.py", "deploy_index.py"]
+# session-only artifacts we never want in git (logs, pulled temp copies, one-off diagnostics)
+EXCLUDE_FILES = ["*_log.txt", "_*.html", "inspect_git.py", "inspect_pi.py",
+                 "fix_perms.py", "fix_meta.py", "check_kvmd.py", "deploy_nginx.py",
+                 "deploy_index.py", "pull_assets.py", "pull_check.py", "get_janus.py",
+                 "validate_backend.py", "rebrand_login.py"]
 
 
 def log(m):

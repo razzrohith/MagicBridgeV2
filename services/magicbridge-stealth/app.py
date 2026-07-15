@@ -21,7 +21,7 @@ read-only rootfs. We toggle rw only for the write, restore ro, then restart
 kvmd-otg. On real hardware, validate the rebind doesn't drop an active session.
 """
 from __future__ import annotations
-import os, sys, json, random, string, subprocess, asyncio
+import os, sys, json, random, string, subprocess, asyncio, hashlib, hmac as _hmac, secrets as _secrets
 from pathlib import Path
 sys.path.insert(0, "/opt/magicbridge/services/common")
 try:
@@ -106,6 +106,43 @@ def current_identity() -> dict:
         "serial": "MB000001", "safe_mode": False,
     })
 
+# ---- separate stealth password (independent of the kvmd login) ------
+# Gates the USB-identity actions with a second password, so someone with a live
+# kvmd session still can't silently reflash the gadget identity. Hash+salt only.
+def _hash_pw(pw: str, salt: str) -> str:
+    return hashlib.sha256((salt + pw).encode()).hexdigest()
+
+def _pw_cfg() -> dict:
+    return load_config("stealth_auth", {})
+
+def _check_pw(body: dict) -> bool:
+    cfg = _pw_cfg()
+    if not cfg.get("hash"):
+        return True  # no gate configured → open
+    return _hmac.compare_digest(_hash_pw(str(body.get("password", "")), cfg.get("salt", "")), cfg["hash"])
+
+def _locked_response():
+    return web.json_response({"ok": False, "locked": True, "error": "stealth password required"}, status=403)
+
+async def lock_status(_):
+    return web.json_response({"ok": True, "password_set": bool(_pw_cfg().get("hash"))})
+
+async def unlock(request: web.Request):
+    body = await request.json()
+    return web.json_response({"ok": _check_pw(body)})
+
+async def set_password(request: web.Request):
+    body = await request.json()
+    new = str(body.get("password", ""))
+    if len(new) < 4:
+        return web.json_response({"ok": False, "error": "password too short (min 4 chars)"}, status=400)
+    cfg = _pw_cfg()
+    if cfg.get("hash") and not _hmac.compare_digest(_hash_pw(str(body.get("current", "")), cfg.get("salt", "")), cfg["hash"]):
+        return web.json_response({"ok": False, "error": "current password incorrect"}, status=403)
+    salt = _secrets.token_hex(8)
+    save_config("stealth_auth", {"salt": salt, "hash": _hash_pw(new, salt)})
+    return web.json_response({"ok": True})
+
 # ---- handlers -------------------------------------------------------
 async def health(_): return web.json_response({"ok": True, "service": "magicbridge-stealth"})
 
@@ -117,6 +154,8 @@ async def get_identity(_):
 
 async def set_identity(request: web.Request):
     body = await request.json()
+    if not _check_pw(body):
+        return _locked_response()
     cur = current_identity()
     if body.get("preset") in PRESETS:
         ident = {**PRESETS[body["preset"]], "preset": body["preset"]}
@@ -142,7 +181,13 @@ async def set_identity(request: web.Request):
     save_config("stealth", ident)
     return web.json_response({"ok": ok, "applied": ident, "detail": out[:1000]})
 
-async def random_serial(_):
+async def random_serial(request: web.Request):
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    if not _check_pw(body):
+        return _locked_response()
     cur = current_identity(); cur["serial"] = rand_serial()
     loop = asyncio.get_running_loop()
     try:
@@ -155,6 +200,8 @@ async def random_serial(_):
 
 async def safe_mode(request: web.Request):
     body = await request.json()
+    if not _check_pw(body):
+        return _locked_response()
     cur = current_identity(); cur["safe_mode"] = bool(body.get("on"))
     # TODO(hw): when on, disable non-essential gadget functions (aux HID, MSD) via
     # override; verify against kvmd's function set on-device.
@@ -176,6 +223,9 @@ def build_app() -> web.Application:
         web.post("/serial/random", random_serial),
         web.post("/safe-mode", safe_mode),
         web.get("/status", status),
+        web.get("/lock-status", lock_status),
+        web.post("/unlock", unlock),
+        web.post("/password", set_password),
     ])
     return app
 
