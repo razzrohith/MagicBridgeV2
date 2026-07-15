@@ -393,6 +393,15 @@ button.btn.danger:hover{background:rgba(229,83,75,.1)}
             <button class="btn danger" onclick="totpDisable()">Disable 2FA</button></div>
         </div>
         <div class="card">
+          <h3>Advanced &amp; native tools</h3>
+          <p class="sub">Engine-level pages kept as a fallback: the web terminal (shell into the device) and the native KVM view.</p>
+          <div class="btns">
+            <button class="btn ghost" onclick="window.open('/index.html','_blank')">Terminal launcher ↗</button>
+            <button class="btn ghost" onclick="window.open('/kvm/','_blank')">Native KVM view ↗</button>
+          </div>
+          <div class="hint">These are the (rebranded) kvmd engine pages. MagicBridgeV2 is your default console — use these only for the web shell or a video fallback.</div>
+        </div>
+        <div class="card">
           <h3>Logs</h3>
           <p class="sub">Recent system &amp; access activity.</p>
           <div class="btns"><button class="btn ghost" onclick="loadLogs()">Load recent logs</button></div>
