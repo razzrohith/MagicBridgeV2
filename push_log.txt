@@ -13,7 +13,6 @@ warning: in the working copy of 'branding/motd', LF will be replaced by CRLF the
 warning: in the working copy of 'docs/FEATURES.md', LF will be replaced by CRLF the next time Git touches it
 warning: in the working copy of 'docs/PORTING.md', LF will be replaced by CRLF the next time Git touches it
 warning: in the working copy of 'kvmd-overrides/override.d/00-magicbridge.yaml', LF will be replaced by CRLF the next time Git touches it
-warning: in the working copy of 'magic-install.sh', LF will be replaced by CRLF the next time Git touches it
 warning: in the working copy of 'nginx/magicbridge.conf', LF will be replaced by CRLF the next time Git touches it
 warning: in the working copy of 'services/common/kvmd_client.py', LF will be replaced by CRLF the next time Git touches it
 warning: in the working copy of 'services/common/mbcommon.py', LF will be replaced by CRLF the next time Git touches it
@@ -29,11 +28,11 @@ warning: in the working copy of 'tools/push_to_github.py', LF will be replaced b
 warning: in the working copy of 'web/index.html', LF will be replaced by CRLF the next time Git touches it
 warning: in the working copy of 'web/stealth/index.html', LF will be replaced by CRLF the next time Git touches it
 warning: in the working copy of 'web/theme.generated.css', LF will be replaced by CRLF the next time Git touches it
-> git commit -m phase 1: installer backport (no-pip/nginx-mako/enable), avahi/.local, mb-ui redirects
-[main 6fe9188] phase 1: installer backport (no-pip/nginx-mako/enable), avahi/.local, mb-ui redirects
- 3 files changed, 35 insertions(+), 23 deletions(-)
+> git commit -m phase 2: own the KVM core - live MJPEG video + full keyboard/mouse over kvmd binary WS
+[main 052f7aa] phase 2: own the KVM core - live MJPEG video + full keyboard/mouse over kvmd binary WS
+ 2 files changed, 107 insertions(+), 28 deletions(-)
 > git push -u origin main
 branch 'main' set up to track 'origin/main'.
 To https://github.com/razzrohith/MagicBridgeV2.git
-   3624118..6fe9188  main -> main
+   6fe9188..052f7aa  main -> main
 DONE. Pushed to https://github.com/razzrohith/MagicBridgeV2.git branch main

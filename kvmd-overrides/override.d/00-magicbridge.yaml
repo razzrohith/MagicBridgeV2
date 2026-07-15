@@ -16,11 +16,8 @@ kvmd:
             jiggler:
                 enabled: false
 
-    # MagicBridgeV2 add-on info surfaced to the UI /api/info (read-only label).
-    info:
-        meta:
-            # Free-form metadata block; our UI reads this to show the brand + version.
-            magicbridge:
-                product: "MagicBridgeV2"
-                version: "2.0.0-dev"
-                upstream: "PiKVM/kvmd (GPLv3)"
+    # NOTE: kvmd's `info/meta` is a PATH to a YAML file (default /etc/kvmd/meta.yaml),
+    # NOT an inline content block. Setting it to a dict makes kvmd try to open the
+    # dict-as-path and throw FileNotFoundError on every /api/info meta read. Our UI
+    # surfaces the MagicBridgeV2 brand/version from its own strings, so we leave
+    # kvmd's default meta.yaml untouched here.

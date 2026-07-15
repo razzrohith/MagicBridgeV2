@@ -161,6 +161,78 @@ async def wifi_connect(request):
     return web.json_response({"ok": True, "ssid": ssid, "note": "added; may take a few seconds to associate"})
 
 
+async def wol(request):
+    """POST /mb/net/wol {mac} — send a Wake-on-LAN magic packet (no external deps)."""
+    import socket
+    body = await request.json()
+    mac = (body.get("mac") or "").strip()
+    hexmac = mac.replace(":", "").replace("-", "").replace(".", "")
+    if len(hexmac) != 12:
+        return web.json_response({"ok": False, "error": "invalid MAC"}, status=400)
+    try:
+        raw = bytes.fromhex(hexmac)
+        packet = b"\xff" * 6 + raw * 16
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+        for port in (9, 7):
+            s.sendto(packet, ("255.255.255.255", port))
+        s.close()
+    except Exception as e:
+        return web.json_response({"ok": False, "error": str(e)}, status=500)
+    return web.json_response({"ok": True, "mac": mac})
+
+
+async def wifi_scan(_):
+    """GET /mb/net/wifi/scan — list nearby SSIDs (wpa_cli on PiKVM, nmcli fallback)."""
+    nets = []
+    rc, _o = sh("wpa_cli", "-i", "wlan0", "scan", timeout=6)
+    time.sleep(2)
+    rc, out = sh("wpa_cli", "-i", "wlan0", "scan_results", timeout=8)
+    if rc == 0 and out:
+        for line in out.splitlines()[1:]:
+            cols = line.split("\t")
+            if len(cols) >= 5 and cols[4].strip():
+                nets.append({"ssid": cols[4].strip(), "signal": cols[2].strip(),
+                             "secure": "WPA" in cols[3] or "WEP" in cols[3]})
+    if not nets:  # NetworkManager fallback
+        rc, out = sh("nmcli", "-t", "-f", "SSID,SIGNAL,SECURITY", "dev", "wifi", "list", timeout=10)
+        if rc == 0:
+            for line in out.splitlines():
+                p = line.split(":")
+                if p and p[0]:
+                    nets.append({"ssid": p[0], "signal": p[1] if len(p) > 1 else "",
+                                 "secure": bool(len(p) > 2 and p[2] and p[2] != "--")})
+    seen, uniq = set(), []
+    for n in sorted(nets, key=lambda x: -int(x["signal"] or 0) if str(x["signal"]).lstrip("-").isdigit() else 0):
+        if n["ssid"] not in seen:
+            seen.add(n["ssid"]); uniq.append(n)
+    return web.json_response({"ok": True, "networks": uniq[:30]})
+
+
+async def update_check(_):
+    """GET /mb/net/update — check for OS/package updates without applying anything."""
+    rc, out = sh("bash", "-c", "checkupdates 2>/dev/null | wc -l", timeout=30)
+    count = out.strip() if rc == 0 and out.strip().isdigit() else None
+    if count is None:
+        rc2, out2 = sh("bash", "-c", "pacman -Qu 2>/dev/null | wc -l", timeout=30)
+        count = out2.strip() if out2.strip().isdigit() else "0"
+    return web.json_response({"ok": True, "updates": int(count),
+                              "detail": ("%s package update(s) available" % count) if count != "0"
+                              else "system is up to date"})
+
+
+async def logs_tail(request):
+    """GET /mb/net/logs?unit=&n= — tail recent journald logs for our services."""
+    unit = request.query.get("unit", "")
+    n = request.query.get("n", "80")
+    n = n if n.isdigit() else "80"
+    args = ["journalctl", "-n", n, "--no-pager", "-o", "short-iso"]
+    if unit in ("kvmd", "kvmd-nginx", "magicbridge-net", "magicbridge-stealth", "magicbridge-agent"):
+        args += ["-u", unit]
+    rc, out = sh(*args, timeout=12)
+    return web.json_response({"ok": rc == 0, "unit": unit or "all", "text": out[-8000:]})
+
+
 def build_app():
     app = web.Application()
     app.add_routes([
@@ -171,6 +243,10 @@ def build_app():
         web.post("/mac", mac_spoof),
         web.post("/tailscale", tailscale_ctl),
         web.post("/wifi", wifi_connect),
+        web.post("/wol", wol),
+        web.get("/wifi/scan", wifi_scan),
+        web.get("/update", update_check),
+        web.get("/logs", logs_tail),
     ])
     return app
 

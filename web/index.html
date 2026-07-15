@@ -157,8 +157,8 @@ button.btn.danger:hover{background:rgba(229,83,75,.1)}
             </div>
             <div class="btns" style="margin:0">
               <button class="btn" id="capBtn" onclick="kvmToggleCapture()">Capture</button>
-              <select id="mouseMode" onchange="kvmMouseMode()" style="width:auto">
-                <option value="abs">Absolute mouse</option><option value="rel">Relative mouse</option></select>
+              <select id="mouseMode" onchange="kvmSetMouseMode()" style="width:auto">
+                <option value="usb">Absolute mouse</option><option value="usb_rel">Relative mouse</option></select>
               <button class="btn ghost" onclick="kvmFullscreen()">Fullscreen</button>
             </div>
           </div>
@@ -182,11 +182,19 @@ button.btn.danger:hover{background:rgba(229,83,75,.1)}
           <div class="btns"><button class="btn" onclick="pasteText()">Send keystrokes</button></div>
         </div>
         <div class="card">
-          <h3>Stream</h3>
+          <h3>Video</h3>
+          <p class="sub">Live stream stats and quality tuning.</p>
           <div class="kv"><span class="k">Encoder</span><span class="v" id="strEnc">—</span></div>
           <div class="kv"><span class="k">Resolution</span><span class="v" id="strRes">—</span></div>
           <div class="kv"><span class="k">Live FPS</span><span class="v" id="strFps">—</span></div>
-          <div class="btns"><button class="btn ghost" onclick="kvmReloadStream()">Reload video</button></div>
+          <label class="f" style="margin-top:14px"><span>JPEG quality · <b id="qVal">80</b>%</span>
+            <input id="strQual" type="range" min="10" max="100" value="80" oninput="$('#qVal').textContent=this.value"></label>
+          <div class="row">
+            <label class="f"><span>Target FPS</span><input id="strFpsIn" type="number" min="1" max="60" value="30"></label>
+            <label class="f"><span>Resolution</span><select id="strResIn"><option value="">(unchanged)</option></select></label>
+          </div>
+          <div class="btns"><button class="btn" onclick="applyStream()">Apply</button>
+            <button class="btn ghost" onclick="kvmReloadStream()">Reload video</button></div>
         </div>
       </div>
     </section>
@@ -208,13 +216,27 @@ button.btn.danger:hover{background:rgba(229,83,75,.1)}
         </div>
         <div class="card">
           <h3>Virtual media (MSD)</h3>
-          <p class="sub">Boot the target from a virtual USB drive / ISO.</p>
-          <label class="f"><span>Image on device</span><input id="msd_img" placeholder="ubuntu-24.04.iso"></label>
-          <div class="btns">
-            <button class="btn" onclick="msdMount()">Mount &amp; connect</button>
-            <button class="btn ghost" onclick="msdEject()">Eject</button>
+          <p class="sub">Boot the target from a virtual USB drive / ISO stored on this device.</p>
+          <div class="kv"><span class="k">Status</span><span class="v" id="msd_state">—</span></div>
+          <div class="kv"><span class="k">Mounted</span><span class="v" id="msd_cur">—</span></div>
+          <div class="sec-title" style="margin-top:14px">Images on device</div>
+          <div id="msd_list" class="hint" style="margin:0 0 10px">—</div>
+          <div class="row">
+            <label class="f"><span>Mount as</span><select id="msd_mode"><option value="cdrom">CD-ROM (ISO)</option><option value="flash">USB flash</option></select></label>
           </div>
-          <div class="kv" style="margin-top:14px"><span class="k">Status</span><span class="v" id="msd_state">—</span></div>
+          <div class="btns">
+            <button class="btn ghost" onclick="msdEject()">Eject</button>
+            <button class="btn ghost" onclick="loadMsd()">Refresh</button>
+          </div>
+          <div class="sec-title" style="margin-top:16px">Upload image</div>
+          <label class="f"><span>Select an ISO / IMG file</span><input id="msd_file" type="file" accept=".iso,.img"></label>
+          <div class="btns"><button class="btn" onclick="msdUpload()">Upload to device</button></div>
+          <div id="msd_prog" class="hint" style="margin-top:8px"></div>
+        </div>
+        <div class="card" id="gpioCard" style="display:none">
+          <h3>GPIO / relays</h3>
+          <p class="sub">Switch and pulse the device's configured GPIO channels.</p>
+          <div id="gpio_list" class="hint" style="margin:0">—</div>
         </div>
         <div class="card">
           <h3>Wake-on-LAN</h3>
@@ -234,11 +256,14 @@ button.btn.danger:hover{background:rgba(229,83,75,.1)}
           <div class="kv"><span class="k">Interface</span><span class="v">wlan0</span></div>
           <div class="kv"><span class="k">State</span><span class="v" id="wifi_state">—</span></div>
           <div class="row" style="margin-top:12px">
-            <label class="f"><span>SSID</span><input id="wifi_ssid" placeholder="network name"></label>
+            <label class="f"><span>SSID</span><input id="wifi_ssid" list="wifi_nets" placeholder="network name">
+              <datalist id="wifi_nets"></datalist></label>
             <label class="f"><span>Password</span><input id="wifi_pw" type="password" placeholder="••••••••"></label>
           </div>
           <div class="btns"><button class="btn" onclick="wifiConnect()">Connect</button>
+            <button class="btn ghost" onclick="wifiScan()">Scan</button>
             <button class="btn ghost" onclick="loadNetwork()">Refresh</button></div>
+          <div id="wifi_scan" class="hint" style="margin-top:8px"></div>
         </div>
         <div class="card">
           <h3>Tailscale &amp; access</h3>
@@ -351,7 +376,7 @@ $$("#nav button").forEach(b=>b.onclick=()=>{
   $$("#nav button").forEach(x=>x.classList.toggle("active",x===b));
   const p=b.dataset.p;$$(".page").forEach(x=>x.classList.toggle("active",x.dataset.page===p));
   $("#ptitle").textContent=titles[p];
-  ({network:loadNetwork,auto:loadAuto,system:loadSystem}[p]||(()=>{}))();
+  ({screen:loadStreamCtl,power:()=>{loadMsd();loadGpio();},network:loadNetwork,auto:loadAuto,system:loadSystem}[p]||(()=>{}))();
 });
 
 /* ===== KVM core — live video + keyboard/mouse over kvmd's binary WebSocket =====
@@ -382,7 +407,9 @@ function kvmState(t,e){
     if(enc)$("#strEnc").textContent=enc;
     if(s.resolution)$("#strRes").textContent=s.resolution.width+"×"+s.resolution.height;
     if(s.stream&&s.stream.clients_stat){const ids=Object.keys(s.stream.clients_stat);if(ids.length)$("#strFps").textContent=s.stream.clients_stat[ids[0]].fps+" fps";}}
-  if(t==="hid"&&e){const on=e.online&&!e.busy;setLed("ledKbd",kvmCap?(on?"g":"y"):"");setLed("ledMouse",kvmCap?(on?"g":"y"):"");}
+  if(t==="hid"&&e){if(e.mouse&&e.mouse.absolute!==undefined){kvmAbs=e.mouse.absolute;const sel=$("#mouseMode");if(sel&&!kvmModeBusy)sel.value=kvmAbs?"usb":"usb_rel";}
+    const on=e.online&&!e.busy;const locked=document.pointerLockElement===$("#streamBox");
+    setLed("ledKbd",(kvmCap||locked)?(on?"g":"y"):"");setLed("ledMouse",(kvmCap||locked)?(on?"g":"y"):"");}
 }
 /* --- senders (binary) --- */
 function wsReady(){return kvmWs&&kvmWs.readyState===1;}
@@ -402,37 +429,97 @@ const clamp127=v=>Math.max(-127,Math.min(127,v|0));
 function kvmToggleCapture(){kvmCap=!kvmCap;const box=$("#streamBox"),btn=$("#capBtn");
   btn.textContent=kvmCap?"Release":"Capture";btn.classList.toggle("ghost",kvmCap);box.classList.toggle("cap",kvmCap);
   box.style.cursor=(kvmCap&&kvmAbs)?"crosshair":"default";
-  if(kvmCap){box.focus();setLed("ledKbd","g");setLed("ledMouse","g");if(!kvmAbs&&box.requestPointerLock)box.requestPointerLock();}
+  if(kvmCap){box.focus();setLed("ledKbd","g");setLed("ledMouse","g");if(!kvmAbs)toast("Relative mouse — click the video to lock the pointer (Esc to release)");}
   else{setLed("ledKbd","");setLed("ledMouse","");if(document.pointerLockElement)document.exitPointerLock();}}
-function kvmMouseMode(){kvmAbs=$("#mouseMode").value==="abs";if(kvmCap){$("#streamBox").style.cursor=kvmAbs?"crosshair":"default";if(!kvmAbs&&$("#streamBox").requestPointerLock)$("#streamBox").requestPointerLock();else if(document.pointerLockElement)document.exitPointerLock();}}
+/* Switch the kvmd HID mouse gadget (usb=absolute, usb_rel=relative). kvmd
+   defaults to absolute and ignores relative reports until the gadget is
+   switched — this is why relative mode was dead before. */
+let kvmModeBusy=false;
+async function kvmSetMouseMode(){const out=$("#mouseMode").value;kvmModeBusy=true;
+  try{const r=await fetch(KVMD+"/hid/set_params?mouse_output="+encodeURIComponent(out),{method:"POST",credentials:"include"});
+    if(r.ok){kvmAbs=(out!=="usb_rel"&&out!=="ps2");$("#streamBox").style.cursor=(kvmCap&&kvmAbs)?"crosshair":"default";
+      if(document.pointerLockElement)document.exitPointerLock();
+      toast(kvmAbs?"Absolute mouse":"Relative mouse — click the video to lock the pointer (Esc to release)");}
+    else toast("Couldn't switch mouse mode (relative may be unavailable on this gadget)","bad");}
+  catch(e){toast("Mouse-mode request failed","bad");}
+  finally{setTimeout(()=>{kvmModeBusy=false;},600);}}
 function kvmFullscreen(){const b=$("#streamBox");(b.requestFullscreen||b.webkitRequestFullscreen||function(){}).call(b);}
 function combo(codes){codes.forEach(c=>sendKey(c,true));setTimeout(()=>codes.slice().reverse().forEach(c=>sendKey(c,false)),80);toast("Sent "+codes.join(" + "));}
 async function pasteText(){const t=$("#paste_txt").value;if(!t)return;const r=await fetch(KVMD+"/hid/print?limit=0",{method:"POST",credentials:"include",body:t});toast(r.ok?"Sent to target":"Send failed",r.ok?"ok":"bad");}
 /* --- wire input on the stream box --- */
 (function(){const box=$("#streamBox");if(!box)return;
   box.addEventListener("contextmenu",e=>e.preventDefault());
-  box.addEventListener("mousedown",e=>{if(!kvmCap)return;e.preventDefault();box.focus();sendBtn(btnName(e.button),true);});
-  box.addEventListener("mouseup",e=>{if(!kvmCap)return;e.preventDefault();sendBtn(btnName(e.button),false);});
-  box.addEventListener("mousemove",e=>{if(!kvmCap)return;
-    if(kvmAbs){const g=imgGeo();sendMove(remap(e.clientX-g.x,0,g.width-1,-32768,32767),remap(e.clientY-g.y,0,g.height-1,-32768,32767));}
-    else if(document.pointerLockElement===box){sendRel(clamp127(e.movementX),clamp127(e.movementY));}});
-  box.addEventListener("wheel",e=>{if(!kvmCap)return;e.preventDefault();sendWheel(0,e.deltaY>0?-5:5);},{passive:false});
-  box.addEventListener("keydown",e=>{if(!kvmCap)return;e.preventDefault();if(!e.repeat)sendKey(e.code,true);});
-  box.addEventListener("keyup",e=>{if(!kvmCap)return;e.preventDefault();sendKey(e.code,false);});
+  const locked=()=>document.pointerLockElement===box;
+  const active=()=>kvmCap||locked();
+  box.addEventListener("mousedown",e=>{
+    // Relative mode: the first click locks the pointer (a user gesture is required).
+    if(!kvmAbs&&!locked()){e.preventDefault();if(box.requestPointerLock)box.requestPointerLock();return;}
+    if(!active())return;e.preventDefault();box.focus();sendBtn(btnName(e.button),true);});
+  box.addEventListener("mouseup",e=>{if(!active())return;e.preventDefault();sendBtn(btnName(e.button),false);});
+  box.addEventListener("mousemove",e=>{
+    if(kvmAbs){if(!kvmCap)return;const g=imgGeo();sendMove(remap(e.clientX-g.x,0,g.width-1,-32768,32767),remap(e.clientY-g.y,0,g.height-1,-32768,32767));}
+    else if(locked()){sendRel(clamp127(e.movementX),clamp127(e.movementY));}});
+  box.addEventListener("wheel",e=>{if(!active())return;e.preventDefault();sendWheel(0,e.deltaY>0?-5:5);},{passive:false});
+  box.addEventListener("keydown",e=>{if(!active())return;e.preventDefault();if(!e.repeat)sendKey(e.code,true);});
+  box.addEventListener("keyup",e=>{if(!active())return;e.preventDefault();sendKey(e.code,false);});
+  // Keep the mouse LED honest as pointer-lock engages/releases (Esc to release).
+  document.addEventListener("pointerlockchange",()=>{const on=locked();setLed("ledMouse",on||kvmCap?"g":"");setLed("ledKbd",on||kvmCap?"g":"");});
 })();
 
 /* power & media */
 async function atx(a){const r=await jpost(KVMD+"/atx/power?action="+a);toast("Power: "+a,(r&&r.ok!==false)?"ok":"bad");setTimeout(refreshTop,800);}
-async function msdMount(){const img=$("#msd_img").value.trim();if(!img)return toast("Enter an image name","bad");
-  await jpost(KVMD+"/msd/set_params?image="+encodeURIComponent(img)+"&cdrom=1");
+async function msdMountName(img){const mode=$("#msd_mode").value;
+  await jpost(KVMD+"/msd/set_params?image="+encodeURIComponent(img)+"&cdrom="+(mode==="cdrom"?1:0));
   const r=await jpost(KVMD+"/msd/set_connected?connected=1");toast(r.ok!==false?"Mounted "+img:"MSD error",r.ok!==false?"ok":"bad");loadMsd();}
 async function msdEject(){await jpost(KVMD+"/msd/set_connected?connected=0");toast("Ejected","ok");loadMsd();}
-async function loadMsd(){const r=await jget(KVMD+"/msd");const d=res(r);$("#msd_state").textContent=d.drive?(d.drive.connected?"connected":"idle"):"n/a";}
-async function wol(){toast("Wake-on-LAN queued");}
+async function msdRemove(img){if(!confirm("Delete "+img+" from the device?"))return;await jpost(KVMD+"/msd/remove?image="+encodeURIComponent(img));toast("Removed "+img,"ok");loadMsd();}
+async function loadMsd(){const r=await jget(KVMD+"/msd");const d=res(r);const drv=d.drive||{},st=d.storage||{};
+  $("#msd_state").textContent=d.online===false?"offline":(drv.connected?"connected":"idle");
+  $("#msd_cur").textContent=drv.image?drv.image.name:"none";
+  const imgs=st.images||{};const names=Object.keys(imgs);
+  if(!names.length){$("#msd_list").textContent="No images uploaded yet.";return;}
+  $("#msd_list").innerHTML=names.map(n=>{const sz=imgs[n].size?(imgs[n].size/1048576).toFixed(0)+" MB":"";
+    return `<div class="kv"><span class="k">${n} <span style="color:var(--text3)">${sz}</span></span>
+      <span style="display:flex;gap:6px"><button class="btn ghost" style="padding:4px 10px" onclick="msdMountName('${n.replace(/'/g,"\\'")}')">Mount</button>
+      <button class="btn danger" style="padding:4px 10px" onclick="msdRemove('${n.replace(/'/g,"\\'")}')">Del</button></span></div>`;}).join("");}
+async function msdUpload(){const f=$("#msd_file").files[0];if(!f)return toast("Pick a file first","bad");
+  $("#msd_prog").textContent="Uploading "+f.name+" …";
+  try{const r=await fetch(KVMD+"/msd/write?image="+encodeURIComponent(f.name),{method:"POST",credentials:"include",body:f});
+    const j=await r.json().catch(()=>({}));$("#msd_prog").textContent=r.ok?("Uploaded "+f.name):("Upload failed: "+(j.result?.error||r.status));
+    toast(r.ok?"Uploaded "+f.name:"Upload failed",r.ok?"ok":"bad");loadMsd();}
+  catch(e){$("#msd_prog").textContent="Upload error: "+e;toast("Upload error","bad");}}
+async function wol(){const mac=$("#wol_mac").value.trim();if(!mac)return toast("Enter the target MAC","bad");
+  const r=await jpost(MB+"/net/wol",{mac});toast(r.ok?"Magic packet sent to "+mac:"WOL failed: "+(r.error||""),r.ok?"ok":"bad");}
+/* stream quality */
+async function applyStream(){const q=$("#strQual").value,fps=$("#strFpsIn").value,rez=$("#strResIn").value;
+  let qs="quality="+q+"&desired_fps="+fps;if(rez)qs+="&resolution="+encodeURIComponent(rez);
+  const r=await jpost(KVMD+"/streamer/set_params?"+qs);toast(r&&r.ok!==false?"Video settings applied":"Stream update failed",r&&r.ok!==false?"ok":"bad");
+  setTimeout(()=>{kvmReloadStream();loadStreamCtl();},600);}
+async function loadStreamCtl(){const s=res(await jget(KVMD+"/streamer"));const st=s.state||s;const feat=s.features||{};
+  const enc=st.encoder||{};const params=st.streamer&&st.streamer.params?st.streamer.params:(st.params||{});
+  if(params.quality){$("#strQual").value=params.quality;$("#qVal").textContent=params.quality;}
+  if(params.desired_fps){const v=typeof params.desired_fps==="object"?params.desired_fps.default:params.desired_fps;if(v)$("#strFpsIn").value=v;}
+  const lim=st.limits||(st.streamer&&st.streamer.limits);const avail=(lim&&lim.available_resolutions)||feat.available_resolutions;
+  const sel=$("#strResIn");if(avail&&avail.length&&sel.options.length<=1){sel.innerHTML='<option value="">(unchanged)</option>'+avail.map(r=>`<option value="${r}">${r}</option>`).join("");}}
+/* GPIO */
+async function loadGpio(){const g=res(await jget(KVMD+"/gpio"));const scheme=(g.model&&g.model.scheme)||{};const state=(g.state&&g.state.outputs)||{};
+  const outs=Object.keys(scheme).filter(k=>scheme[k].mode==="output");
+  if(!outs.length){$("#gpioCard").style.display="none";return;}
+  $("#gpioCard").style.display="";
+  $("#gpio_list").innerHTML=outs.map(ch=>{const nm=scheme[ch].name||ch;const on=state[ch]&&state[ch].state;
+    return `<div class="kv"><span class="k">${nm} <span class="tag ${on?'ok':''}">${on?'on':'off'}</span></span>
+      <span style="display:flex;gap:6px"><button class="btn ghost" style="padding:4px 10px" onclick="gpioSwitch('${ch}',${on?0:1})">${on?'Off':'On'}</button>
+      <button class="btn ghost" style="padding:4px 10px" onclick="gpioPulse('${ch}')">Pulse</button></span></div>`;}).join("");}
+async function gpioSwitch(ch,st){await jpost(KVMD+"/gpio/switch?channel="+ch+"&state="+st);toast("GPIO "+ch+" "+(st?"on":"off"),"ok");setTimeout(loadGpio,400);}
+async function gpioPulse(ch){await jpost(KVMD+"/gpio/pulse?channel="+ch);toast("Pulsed "+ch,"ok");setTimeout(loadGpio,600);}
 
 /* network */
 async function loadNetwork(){const r=await jget(MB+"/net/status");if(r){$("#ts_state").textContent=r.tailscale&&r.tailscale.up?"up":"down";$("#wifi_state").textContent="connected";const d=(r.duckdns||{});$("#dd_last").textContent=d.last||"—";}}
 async function wifiConnect(){const r=await jpost(MB+"/net/wifi",{ssid:$("#wifi_ssid").value,password:$("#wifi_pw").value});toast(r.ok?"Wi-Fi updated":"Wi-Fi: "+(r.error||r.todo||"pending"),r.ok?"ok":"");}
+async function wifiScan(){$("#wifi_scan").textContent="Scanning…";const r=await jget(MB+"/net/wifi/scan");
+  if(!r||!r.ok||!r.networks){$("#wifi_scan").textContent="Scan unavailable";return;}
+  $("#wifi_nets").innerHTML=r.networks.map(n=>`<option value="${n.ssid}">`).join("");
+  $("#wifi_scan").innerHTML=r.networks.length?("Found: "+r.networks.map(n=>n.ssid+(n.secure?" 🔒":"")).join(", ")):"No networks found";}
 async function tailscale(a){const r=await jpost(MB+"/net/tailscale",{action:a});toast("Tailscale "+a,(r&&r.ok)?"ok":"");loadNetwork();}
 async function lockdown(on){const r=await jpost(MB+"/net/lockdown",{on});toast("Lockdown "+(on?"on":"off"),(r&&r.ok)?"ok":"");}
 async function duckdns(){const r=await jpost(MB+"/net/duckdns",{domain:$("#dd_domain").value,token:$("#dd_token").value});toast(r.ok?"DuckDNS updated":"DuckDNS: "+(r.error||"error"),r.ok?"ok":"bad");loadNetwork();}
@@ -457,9 +544,11 @@ async function loadSystem(){const r=await jget(KVMD+"/info");const d=res(r);
   $("#h_temp").textContent=t?t+" °C":"—";
   const thr=hw.health&&hw.health.throttling;$("#h_throttle").textContent=thr?(thr.parsed_flags&&thr.parsed_flags.undervoltage&&thr.parsed_flags.undervoltage.now?"undervoltage":"ok"):"ok";
   const s=await jget(KVMD+"/streamer");$("#h_stream").textContent=(res(s).state&&res(s).state.encoder&&res(s).state.encoder.type)||"—";}
-async function checkUpdate(){$("#upd_state").textContent="checking…";const r=await jpost(MB+"/net/../update").catch(()=>null);$("#upd_state").textContent="run pikvm-update from console";}
+async function checkUpdate(){$("#upd_state").textContent="checking…";const r=await jget(MB+"/net/update");
+  $("#upd_state").textContent=r&&r.ok?r.detail:"check unavailable";}
 async function power(a){if(!confirm("Really "+a+" the device?"))return;await jpost(KVMD+"/"+(a==="reboot"?"reboot":"shutdown"));toast("Sent "+a);}
-async function loadLogs(){$("#logbox").textContent="loading…";const r=await jget(MB+"/net/status");$("#logbox").textContent="Log viewer wires to journald on the device.\nservices: net/stealth/agent + kvmd-nginx active.";}
+async function loadLogs(){$("#logbox").textContent="loading…";const r=await jget(MB+"/net/logs?n=120");
+  $("#logbox").textContent=(r&&r.text)?r.text:"No logs returned (journald may be restricted).";}
 
 /* top bar */
 async function refreshTop(){const r=await jget(KVMD+"/info");const d=res(r);const hw=d.hw||{};
@@ -470,7 +559,7 @@ async function refreshTop(){const r=await jget(KVMD+"/info");const d=res(r);cons
   $("#atx_led").textContent=on?"on":"off";$("#atx_hdd").textContent=(ad.leds&&ad.leds.hdd)?"active":"idle";}
 function fmtUp(s){if(!s)return "—";s=+s;const h=Math.floor(s/3600),m=Math.floor(s%3600/60);return h+"h "+m+"m";}
 
-kvmReloadStream();kvmConnect();refreshTop();loadMsd();setInterval(refreshTop,5000);
+kvmReloadStream();kvmConnect();refreshTop();loadMsd();loadStreamCtl();loadGpio();setInterval(refreshTop,5000);
 </script>
 </body>
 </html>
