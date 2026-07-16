@@ -21,7 +21,7 @@ read-only rootfs. We toggle rw only for the write, restore ro, then restart
 kvmd-otg. On real hardware, validate the rebind doesn't drop an active session.
 """
 from __future__ import annotations
-import os, sys, json, random, string, subprocess, asyncio, hashlib, hmac as _hmac, secrets as _secrets
+import os, sys, json, random, string, subprocess, asyncio, hashlib, hmac as _hmac, secrets as _secrets, time
 from pathlib import Path
 sys.path.insert(0, "/opt/magicbridge/services/common")
 try:
@@ -198,6 +198,58 @@ async def random_serial(request: web.Request):
     save_config("stealth", cur)
     return web.json_response({"ok": ok, "serial": cur["serial"], "detail": out[:500]})
 
+RANDOM_VENDORS = [("0x046d", "Logitech"), ("0x045e", "Microsoft"), ("0x413c", "Dell"),
+                  ("0x1bcf", "Sunplus"), ("0x0951", "Kingston"), ("0x30fa", "Generic"),
+                  ("0x1c4f", "SiGma"), ("0x093a", "Pixart")]
+RANDOM_PRODUCTS = ["USB Receiver", "Composite Device", "HID Keyboard", "Wireless Receiver",
+                   "USB Input Device", "Optical Mouse", "Multimedia Keyboard"]
+
+
+async def randomize(request: web.Request):
+    """POST /mb/stealth/randomize — spoof a fresh random USB identity + serial in one shot."""
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    if not _check_pw(body):
+        return _locked_response()
+    vid, mfr = random.choice(RANDOM_VENDORS)
+    ident = {
+        "preset": "random", "label": "Randomized identity", "verified": False,
+        "vendor_id": int(vid, 0), "product_id": random.randint(0x1000, 0xFFFF),
+        "manufacturer": mfr, "product": random.choice(RANDOM_PRODUCTS),
+        "serial": rand_serial(), "safe_mode": current_identity().get("safe_mode", False),
+    }
+    loop = asyncio.get_running_loop()
+    try:
+        await loop.run_in_executor(None, write_otg_override, ident)
+        ok, out = await loop.run_in_executor(None, rebuild_gadget)
+    except Exception as e:
+        return web.json_response({"ok": False, "error": f"gadget apply failed: {e}"}, status=200)
+    save_config("stealth", ident)
+    return web.json_response({"ok": ok, "applied": ident, "detail": out[:500]})
+
+
+async def backup(_):
+    """GET /mb/stealth/backup — export MagicBridge config for safekeeping."""
+    return web.json_response({"ok": True, "ts": int(time.time()), "config": {
+        "net": load_config("net", {}), "stealth": load_config("stealth", {}),
+    }})
+
+
+async def restore(request: web.Request):
+    """POST /mb/stealth/restore {config} — restore an exported config."""
+    body = await request.json()
+    if not _check_pw(body):
+        return _locked_response()
+    cfg = body.get("config", {})
+    if isinstance(cfg.get("net"), dict):
+        save_config("net", cfg["net"])
+    if isinstance(cfg.get("stealth"), dict):
+        save_config("stealth", cfg["stealth"])
+    return web.json_response({"ok": True, "restored": list(cfg.keys())})
+
+
 async def safe_mode(request: web.Request):
     body = await request.json()
     if not _check_pw(body):
@@ -221,6 +273,9 @@ def build_app() -> web.Application:
         web.get("/identity", get_identity),
         web.post("/identity", set_identity),
         web.post("/serial/random", random_serial),
+        web.post("/randomize", randomize),
+        web.get("/backup", backup),
+        web.post("/restore", restore),
         web.post("/safe-mode", safe_mode),
         web.get("/status", status),
         web.get("/lock-status", lock_status),

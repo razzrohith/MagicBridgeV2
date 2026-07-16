@@ -6,61 +6,82 @@
 <title>MagicBridgeV2 · Stealth</title>
 <style>
 :root{
-  --bg:#0b0e13; --surface:#12161d; --surface2:#171c24; --surface3:#1d232c;
-  --border:#262d38; --border2:#313a47;
-  --text:#e6edf3; --text2:#9aa4b2; --text3:#6b7482;
-  --accent:#5b8cff; --accent2:#3a6fe0; --accent-soft:rgba(91,140,255,.12);
-  --ok:#3fb27f; --warn:#d9a441; --danger:#e5534b;
-  --radius:11px; --shadow:0 1px 2px rgba(0,0,0,.4),0 8px 24px rgba(0,0,0,.22);
+  --bg:#05070d; --sf:rgba(13,18,32,.72); --sf2:rgba(20,27,46,.6);
+  --br:rgba(0,229,255,.16); --br2:rgba(176,38,255,.22);
+  --t1:#e8f6ff; --t2:#8aa2c0; --t3:#516079;
+  --cy:#00e5ff; --cy-bg:rgba(0,229,255,.10); --vi:#b026ff; --vi-bg:rgba(176,38,255,.12);
+  --ok:#00e5a8; --wa:#ffb020; --er:#ff4d6d;
 }
 *{box-sizing:border-box}
-body{margin:0;min-height:100vh;background:var(--bg);color:var(--text);
-  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,Helvetica,Arial,sans-serif;font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased}
-a{color:var(--accent);text-decoration:none}
-.wrap{max-width:1120px;margin:0 auto;padding:22px 26px 60px}
-.hdr{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;padding-bottom:18px;margin-bottom:22px;border-bottom:1px solid var(--border)}
+html,body{margin:0;min-height:100%}
+body{background:var(--bg);color:var(--t1);
+  font-family:"SF Mono",ui-monospace,"Cascadia Code","Roboto Mono",Menlo,Consolas,monospace;
+  font-size:13px;line-height:1.5;-webkit-font-smoothing:antialiased;
+  background-image:radial-gradient(1200px 600px at 15% -10%,rgba(0,229,255,.08),transparent 60%),
+    radial-gradient(1000px 500px at 100% 0,rgba(176,38,255,.10),transparent 55%),
+    linear-gradient(transparent 96%,rgba(0,229,255,.03) 100%);
+  background-size:auto,auto,100% 26px}
+a{color:var(--cy);text-decoration:none}
+.wrap{max-width:1180px;margin:0 auto;padding:20px 24px 70px}
+.hdr{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;
+  padding-bottom:16px;margin-bottom:22px;border-bottom:1px solid var(--br)}
 .brand{display:flex;align-items:center;gap:13px}
-.logo{width:40px;height:40px;border-radius:10px;background:linear-gradient(145deg,#2b3442,#171c24);border:1px solid var(--border2);display:grid;place-items:center;font-weight:800;font-size:17px}
-.brand h1{margin:0;font-size:18px;font-weight:600;letter-spacing:.2px}
-.brand span{font-size:11px;color:var(--text3);letter-spacing:1.5px;text-transform:uppercase}
-.hdr .right{display:flex;align-items:center;gap:14px}
-.status{display:inline-flex;align-items:center;gap:8px;font-size:12px;color:var(--text2)}
-.status i{width:8px;height:8px;border-radius:50%;background:var(--ok);box-shadow:0 0 0 3px rgba(63,178,127,.15)}
-.back{font-size:12.5px;color:var(--text2);border:1px solid var(--border2);padding:8px 13px;border-radius:8px}
-.back:hover{background:var(--surface3);color:var(--text)}
-.grid{display:grid;grid-template-columns:1.15fr 1fr;gap:16px}
-@media(max-width:860px){.grid{grid-template-columns:1fr}}
-.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:18px;box-shadow:var(--shadow)}
-.card h2{margin:0 0 3px;font-size:14px;font-weight:600}
-.card .sub{margin:0 0 15px;color:var(--text2);font-size:12.5px;line-height:1.5}
+.logo{width:40px;height:40px;border-radius:9px;display:grid;place-items:center;font-weight:800;font-size:17px;color:#03121a;
+  background:linear-gradient(135deg,var(--cy),var(--vi));box-shadow:0 0 22px rgba(0,229,255,.45)}
+.brand h1{margin:0;font-size:15px;font-weight:700;letter-spacing:3px;text-transform:uppercase;
+  background:linear-gradient(90deg,var(--cy),var(--vi));-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+.brand span{font-size:10px;color:var(--t3);letter-spacing:2px;text-transform:uppercase}
+.right{display:flex;align-items:center;gap:14px}
+.ping{display:inline-flex;align-items:center;gap:8px;font-size:11px;color:var(--cy);letter-spacing:1.5px;text-transform:uppercase}
+.ping i{width:8px;height:8px;border-radius:50%;background:var(--cy);box-shadow:0 0 0 3px rgba(0,229,255,.18),0 0 10px var(--cy);animation:pulse 2s infinite}
+@keyframes pulse{50%{opacity:.35}}
+.back{font-size:11px;color:var(--t2);border:1px solid var(--br2);padding:8px 13px;border-radius:7px;letter-spacing:1px;text-transform:uppercase}
+.back:hover{border-color:var(--vi);color:var(--vi);box-shadow:0 0 14px rgba(176,38,255,.3)}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:16px}
+.card{background:var(--sf);backdrop-filter:blur(16px) saturate(140%);border:1px solid var(--br);border-radius:12px;padding:16px 17px;
+  box-shadow:0 0 0 1px rgba(0,229,255,.04),0 18px 40px rgba(0,0,0,.5);position:relative;overflow:hidden}
+.card::before{content:"";position:absolute;inset:0 0 auto 0;height:1px;background:linear-gradient(90deg,transparent,var(--cy),var(--vi),transparent);opacity:.7}
 .card.full{grid-column:1/-1}
-.presets{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-bottom:15px}
-.preset{border:1px solid var(--border2);border-radius:9px;padding:11px 12px;cursor:pointer;background:var(--surface3);transition:.12s}
-.preset:hover{border-color:var(--accent)}
-.preset.sel{border-color:var(--accent);background:var(--accent-soft)}
-.preset b{display:block;font-size:13px;font-weight:600;margin-bottom:4px}
-.preset .vf{font-size:11px;font-weight:600}
-.vf.yes{color:var(--ok)} .vf.no{color:var(--warn)}
-label.f{display:block;margin-bottom:12px}
-label.f span{display:block;font-size:11.5px;color:var(--text2);margin-bottom:5px}
-input,select{width:100%;background:var(--surface3);border:1px solid var(--border2);color:var(--text);border-radius:8px;padding:9px 11px;font:inherit;font-size:13.5px}
-input:focus,select:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
-.row{display:flex;gap:10px;flex-wrap:wrap}.row>label.f{flex:1;min-width:120px}
-button.btn{all:unset;box-sizing:border-box;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:7px;padding:9px 15px;border-radius:8px;font-size:13px;font-weight:600;background:var(--accent);color:#fff}
-button.btn:hover{background:var(--accent2)}
-button.btn.ghost{background:transparent;border:1px solid var(--border2);color:var(--text)}
-button.btn.ghost:hover{background:var(--surface3)}
-.btns{display:flex;gap:9px;flex-wrap:wrap;margin-top:14px}
-.kv{display:flex;justify-content:space-between;gap:12px;padding:8px 0;border-bottom:1px solid var(--border);font-size:13px}
-.kv:last-child{border:0}.kv .k{color:var(--text2)}.kv .v{color:var(--text);font-weight:500;text-align:right}
-.tag{font-size:11px;font-weight:600;padding:2px 9px;border-radius:20px;border:1px solid var(--border2);color:var(--text2)}
-.tag.ok{color:var(--ok);border-color:rgba(63,178,127,.35);background:rgba(63,178,127,.08)}
-.tag.no{color:var(--warn);border-color:rgba(217,164,65,.35);background:rgba(217,164,65,.08)}
-.hint{font-size:11.5px;color:var(--text3);margin-top:11px;line-height:1.55}
-.switch{display:flex;align-items:flex-end;gap:10px;margin-top:6px}
+.card h2{margin:0 0 3px;font-size:12px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t1);display:flex;align-items:center;gap:8px}
+.card h2 .dot{width:6px;height:6px;border-radius:50%;background:var(--vi);box-shadow:0 0 8px var(--vi)}
+.card .sub{margin:0 0 14px;color:var(--t2);font-size:11.5px;letter-spacing:.3px}
+.presets{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px}
+.preset{border:1px solid var(--br2);border-radius:8px;padding:10px 11px;cursor:pointer;background:var(--sf2);transition:.13s}
+.preset:hover{border-color:var(--cy);box-shadow:0 0 14px rgba(0,229,255,.22)}
+.preset.sel{border-color:var(--cy);background:var(--cy-bg);box-shadow:0 0 14px rgba(0,229,255,.3)}
+.preset b{display:block;font-size:12px;font-weight:600;margin-bottom:4px;color:var(--t1)}
+.preset .vf{font-size:10px;font-weight:600;letter-spacing:.5px;text-transform:uppercase}
+.vf.yes{color:var(--ok)} .vf.no{color:var(--wa)}
+label.f{display:block;margin-bottom:11px}
+label.f span{display:block;font-size:10px;color:var(--t3);margin-bottom:5px;letter-spacing:1.5px;text-transform:uppercase}
+input,select,textarea{width:100%;background:rgba(5,7,13,.8);border:1px solid var(--br2);color:var(--t1);
+  border-radius:7px;padding:9px 11px;font:inherit;font-size:12.5px;outline:none;transition:border .15s,box-shadow .15s}
+input::placeholder{color:var(--t3)}
+input:focus,select:focus,textarea:focus{border-color:var(--cy);box-shadow:0 0 0 3px var(--cy-bg)}
+.row{display:flex;gap:9px;flex-wrap:wrap}.row>label.f{flex:1;min-width:110px}
+button.btn{all:unset;box-sizing:border-box;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:7px;
+  padding:9px 15px;border-radius:7px;font-size:11.5px;font-weight:700;letter-spacing:1px;text-transform:uppercase;
+  border:1px solid var(--br2);background:var(--sf2);color:var(--t2);transition:.14s}
+button.btn:hover{border-color:var(--cy);color:var(--cy);box-shadow:0 0 14px rgba(0,229,255,.25)}
+button.btn.pri{background:linear-gradient(135deg,rgba(0,229,255,.16),rgba(176,38,255,.16));border-color:var(--cy);color:var(--cy)}
+button.btn.pri:hover{box-shadow:0 0 20px rgba(0,229,255,.4)}
+button.btn.vi{border-color:var(--vi);color:var(--vi)}button.btn.vi:hover{box-shadow:0 0 16px rgba(176,38,255,.4)}
+button.btn.dn{border-color:rgba(255,77,109,.45);color:var(--er)}button.btn.dn:hover{box-shadow:0 0 14px rgba(255,77,109,.35)}
+.btns{display:flex;gap:9px;flex-wrap:wrap;margin-top:13px}
+.kv{display:flex;justify-content:space-between;gap:12px;padding:7px 0;border-bottom:1px solid var(--br);font-size:12px}
+.kv:last-child{border:0}.kv .k{color:var(--t2);letter-spacing:.5px}.kv .v{color:var(--t1);font-weight:600;text-align:right}
+.tag{font-size:10px;font-weight:700;padding:2px 9px;border-radius:20px;border:1px solid var(--br2);color:var(--t2);letter-spacing:1px;text-transform:uppercase}
+.tag.ok{color:var(--ok);border-color:rgba(0,229,168,.4);background:rgba(0,229,168,.08)}
+.tag.no{color:var(--wa);border-color:rgba(255,176,32,.4);background:rgba(255,176,32,.08)}
+.tag.cy{color:var(--cy);border-color:var(--br);background:var(--cy-bg)}
+.hint{font-size:10.5px;color:var(--t3);margin-top:10px;line-height:1.55;letter-spacing:.3px}
+.sec{font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--vi);margin:15px 0 9px}
+pre{margin:11px 0 0;max-height:190px;overflow:auto;background:rgba(5,7,13,.85);border:1px solid var(--br);border-radius:8px;
+  padding:10px;font-size:11px;color:var(--t2);white-space:pre-wrap}
 #toast{position:fixed;right:20px;bottom:20px;display:flex;flex-direction:column;gap:9px;z-index:60}
-.t{background:var(--surface2);border:1px solid var(--border2);border-left:3px solid var(--accent);padding:11px 15px;border-radius:9px;font-size:13px;box-shadow:0 10px 30px rgba(0,0,0,.5);max-width:340px}
-.t.ok{border-left-color:var(--ok)}.t.bad{border-left-color:var(--danger)}
+.t{background:rgba(13,18,32,.95);border:1px solid var(--br2);border-left:3px solid var(--cy);padding:11px 15px;border-radius:8px;
+  font-size:12px;box-shadow:0 0 20px rgba(0,229,255,.2);max-width:340px;letter-spacing:.3px}
+.t.ok{border-left-color:var(--ok)}.t.bad{border-left-color:var(--er)}
 </style>
 </head>
 <body>
@@ -68,35 +89,38 @@ button.btn.ghost:hover{background:var(--surface3)}
   <div class="hdr">
     <div class="brand">
       <div class="logo">M</div>
-      <div><h1>Stealth Control</h1><span>MagicBridgeV2 · spoofing suite</span></div>
+      <div><h1>Stealth Control</h1><span>MagicBridgeV2 · Anonymity &amp; spoofing suite</span></div>
     </div>
     <div class="right">
-      <span class="status"><i></i> System online</span>
+      <span class="ping"><i></i> System online</span>
       <a class="back" href="/mb/ui/">&#8592; Console</a>
     </div>
   </div>
 
   <div class="grid">
+    <!-- STEALTH LOCK -->
     <div class="card full" id="lockCard">
-      <h2>Stealth lock &nbsp;<span class="tag" id="lockState">—</span></h2>
-      <p class="sub">A password separate from the console login. Changing the USB identity the target trusts is gated behind it.</p>
+      <h2><span class="dot"></span>Stealth lock &nbsp;<span class="tag" id="lockState">—</span></h2>
+      <p class="sub">A gate separate from the console login. Spoofing actions require it once set.</p>
       <div class="row" id="unlockRow" style="display:none">
         <label class="f"><span>Stealth password</span><input id="unlockPw" type="password" placeholder="enter to unlock" onkeydown="if(event.key==='Enter')doUnlock()"></label>
-        <button class="btn" style="align-self:flex-end" onclick="doUnlock()">Unlock</button>
+        <button class="btn pri" style="align-self:flex-end" onclick="doUnlock()">Unlock</button>
       </div>
       <div class="row">
         <label class="f"><span>New stealth password</span><input id="pwNew" type="password" placeholder="min 4 chars"></label>
-        <button class="btn ghost" style="align-self:flex-end" onclick="setStealthPw()">Save password</button>
+        <button class="btn" style="align-self:flex-end" onclick="setStealthPw()">Save password</button>
       </div>
-      <div class="hint">If a password is set, USB-identity actions require it. Forgot it? Clear <code>stealth_auth</code> via SSH.</div>
+      <div class="hint">Forgot it? Clear <code>stealth_auth</code> over SSH.</div>
     </div>
+
+    <!-- USB IDENTITY -->
     <div class="card">
-      <h2>USB identity</h2>
-      <p class="sub">What the target PC sees the Pi as. Applying rebuilds the USB gadget (kvmd-otg) — briefly re-plugs the emulated device.</p>
+      <h2><span class="dot"></span>USB identity spoofing</h2>
+      <p class="sub">What the target PC sees the bridge as. Applying rebuilds the USB gadget — briefly re-plugs the emulated device.</p>
       <div class="presets" id="presets"></div>
       <div class="row">
-        <label class="f"><span>Vendor ID</span><input id="vid" placeholder="0x046D"></label>
-        <label class="f"><span>Product ID</span><input id="pid" placeholder="0xC52B"></label>
+        <label class="f"><span>Vendor ID</span><input id="vid" placeholder="0x046d"></label>
+        <label class="f"><span>Product ID</span><input id="pid" placeholder="0xc52b"></label>
       </div>
       <div class="row">
         <label class="f"><span>Manufacturer</span><input id="mfr" placeholder="Logitech"></label>
@@ -104,51 +128,114 @@ button.btn.ghost:hover{background:var(--surface3)}
       </div>
       <label class="f"><span>Serial</span><input id="serial" placeholder="auto / leave blank"></label>
       <div class="btns">
-        <button class="btn" onclick="applyIdentity()">Apply identity</button>
-        <button class="btn ghost" onclick="randSerial()">Randomise serial</button>
+        <button class="btn pri" onclick="applyIdentity()">Apply identity</button>
+        <button class="btn vi" onclick="randomizeIdentity()">⟳ Randomize identity</button>
+        <button class="btn" onclick="randSerial()">Randomize serial</button>
       </div>
       <div class="hint" id="verifyNote"></div>
     </div>
 
+    <!-- MAC + SAFE MODE -->
     <div class="card">
-      <h2>Active gadget</h2>
-      <div id="identInfo"></div>
-      <div class="switch">
-        <label class="f" style="flex:0 0 auto;margin:0"><span>Safe mode</span>
-          <select id="safe"><option value="false">Disabled</option><option value="true">Enabled</option></select></label>
-        <button class="btn ghost" onclick="setSafe()">Set</button>
-      </div>
-      <p class="hint">Safe mode trims non-essential USB interfaces. Function-level trimming is validated on the V4 Mini.</p>
-    </div>
-
-    <div class="card">
-      <h2>MAC address</h2>
-      <p class="sub">Change the network hardware address. Persists across reboot via MagicBridge config.</p>
+      <h2><span class="dot"></span>MAC address spoofing</h2>
+      <p class="sub">Change the network hardware address. Persists across reboot.</p>
       <div class="row">
         <label class="f"><span>Interface</span><input id="macIf" value="wlan0"></label>
-        <label class="f"><span>MAC</span><input id="macVal" placeholder="02:aa:bb:cc:dd:ee"></label>
+        <label class="f"><span>MAC</span><input id="macVal" placeholder="02:1a:2b:cc:dd:ee"></label>
       </div>
       <div class="btns">
-        <button class="btn" onclick="macApply(false)">Apply</button>
-        <button class="btn ghost" onclick="macApply(true)">Randomise</button>
+        <button class="btn pri" onclick="macApply(false)">Apply</button>
+        <button class="btn vi" onclick="macApply(true)">⟳ Randomize MAC</button>
       </div>
       <div class="kv" style="margin-top:12px"><span class="k">Current</span><span class="v" id="macCur">—</span></div>
+      <div class="sec">Safe mode</div>
+      <div class="row">
+        <label class="f" style="flex:0 0 auto"><span>Minimise exposed interfaces</span>
+          <select id="safe" style="width:auto"><option value="false">Disabled</option><option value="true">Enabled</option></select></label>
+        <button class="btn" style="align-self:flex-end" onclick="setSafe()">Set</button>
+      </div>
     </div>
 
+    <!-- MONITOR / EDID -->
     <div class="card">
-      <h2>Monitor identity (EDID)</h2>
-      <p class="sub">What monitor the target thinks is attached. Handled natively by kvmd (edidconf) on the V4 Mini.</p>
-      <div class="kv"><span class="k">Source</span><span class="v">kvmd edidconf</span></div>
-      <div class="kv"><span class="k">Status</span><span class="v"><span class="tag ok">native</span></span></div>
-      <p class="hint">EDID spoofing ships working on PiKVM hardware; presets/clone are configured on-device once connected to a target.</p>
+      <h2><span class="dot"></span>Monitor identity (EDID)</h2>
+      <p class="sub">What monitor the target thinks is attached. Presets change the resolutions offered.</p>
+      <label class="f"><span>EDID preset</span><select id="edidPreset"></select></label>
+      <div class="btns"><button class="btn pri" onclick="edidApply()">Apply preset</button>
+        <button class="btn" onclick="loadEdid()">Refresh</button></div>
+      <pre id="edidCur">—</pre>
     </div>
 
+    <!-- ANONYMITY / NETWORK -->
+    <div class="card">
+      <h2><span class="dot"></span>Anonymity &amp; remote access</h2>
+      <p class="sub">Private tunnel, public exposure, and access lockdown.</p>
+      <div class="kv"><span class="k">Tailscale</span><span class="v" id="tsState">—</span></div>
+      <div class="btns">
+        <button class="btn pri" onclick="ts('up')">Bring up</button>
+        <button class="btn" onclick="ts('down')">Down</button>
+        <button class="btn" onclick="tsInstall()">Install</button>
+      </div>
+      <div class="btns">
+        <button class="btn vi" onclick="funnel(true)">Funnel on</button>
+        <button class="btn" onclick="funnel(false)">Funnel off</button>
+      </div>
+      <div class="sec">Lockdown</div>
+      <div class="btns" style="margin-top:0">
+        <button class="btn dn" onclick="lockdown(true)">Tailscale-only ON</button>
+        <button class="btn" onclick="lockdown(false)">OFF</button>
+      </div>
+      <div class="hint">Lockdown restricts the web UI to the Tailscale interface. SSH is never touched.</div>
+    </div>
+
+    <!-- WIFI -->
+    <div class="card">
+      <h2><span class="dot"></span>Wi-Fi</h2>
+      <p class="sub">Move the bridge onto another network without a screen.</p>
+      <div class="row">
+        <label class="f"><span>SSID</span><input id="wSsid" list="wNets" placeholder="network name"><datalist id="wNets"></datalist></label>
+        <label class="f"><span>Password</span><input id="wPw" type="password" placeholder="••••••••"></label>
+      </div>
+      <div class="btns">
+        <button class="btn pri" onclick="wifiConnect()">Connect</button>
+        <button class="btn" onclick="wifiScan()">Scan</button>
+      </div>
+      <div id="wScan" class="hint"></div>
+      <div class="sec">Dynamic DNS</div>
+      <div class="row">
+        <label class="f"><span>DuckDNS domain</span><input id="ddDomain" placeholder="mybox"></label>
+        <label class="f"><span>Token</span><input id="ddToken" placeholder="token"></label>
+      </div>
+      <div class="btns"><button class="btn" onclick="duckdns()">Update &amp; save</button></div>
+    </div>
+
+    <!-- CONFIG BACKUP/RESTORE -->
+    <div class="card">
+      <h2><span class="dot"></span>Config backup</h2>
+      <p class="sub">Export/import the MagicBridge spoofing &amp; network config.</p>
+      <div class="btns">
+        <button class="btn pri" onclick="backup()">Download backup</button>
+        <label class="btn vi" style="cursor:pointer">Restore…<input id="restoreFile" type="file" accept=".json" style="display:none" onchange="restore(this)"></label>
+      </div>
+      <div id="cfgMsg" class="hint"></div>
+    </div>
+
+    <!-- LOGS -->
+    <div class="card">
+      <h2><span class="dot"></span>Activity logs</h2>
+      <p class="sub">Recent system &amp; service activity from the device.</p>
+      <div class="btns"><button class="btn" onclick="loadLogs()">Load recent logs</button></div>
+      <pre id="logbox">—</pre>
+    </div>
+
+    <!-- STATUS -->
     <div class="card full">
-      <h2>Stealth status</h2>
-      <div class="row" style="gap:26px">
-        <div class="kv" style="flex:1"><span class="k">kvmd-otg</span><span class="v" id="stOtg">—</span></div>
-        <div class="kv" style="flex:1"><span class="k">Override present</span><span class="v" id="stOv">—</span></div>
-        <div class="kv" style="flex:1"><span class="k">Tailscale</span><span class="v" id="stTs">—</span></div>
+      <h2><span class="dot"></span>Stealth status</h2>
+      <div class="row" style="gap:24px">
+        <div class="kv" style="flex:1;min-width:150px"><span class="k">Active identity</span><span class="v" id="stIdent">—</span></div>
+        <div class="kv" style="flex:1;min-width:120px"><span class="k">USB gadget</span><span class="v" id="stOtg">—</span></div>
+        <div class="kv" style="flex:1;min-width:120px"><span class="k">MAC</span><span class="v" id="stMac">—</span></div>
+        <div class="kv" style="flex:1;min-width:120px"><span class="k">Tailscale</span><span class="v" id="stTs">—</span></div>
       </div>
     </div>
   </div>
@@ -160,51 +247,88 @@ const $=s=>document.querySelector(s), MB="/mb";
 function toast(m,k=""){const t=document.createElement("div");t.className="t "+k;t.textContent=m;document.getElementById("toast").appendChild(t);setTimeout(()=>t.remove(),4200);}
 async function jget(u){try{const r=await fetch(u,{credentials:"include"});return await r.json();}catch(e){return null;}}
 async function jpost(u,b){try{const r=await fetch(u,{method:"POST",credentials:"include",headers:{"content-type":"application/json"},body:b?JSON.stringify(b):null});return await r.json();}catch(e){return {ok:false,error:String(e)};}}
-let PRESETS={};
 const toHex=n=>n?("0x"+Number(n).toString(16).toUpperCase()):"";
-/* --- separate stealth password gate --- */
+let PRESETS={};
+
+/* ---- stealth lock ---- */
 let STEALTH_PW="",PW_SET=false;
 async function checkLock(){const r=await jget(MB+"/stealth/lock-status");PW_SET=!!(r&&r.password_set);
   $("#unlockRow").style.display=(PW_SET&&!STEALTH_PW)?"":"none";
-  const el=$("#lockState");el.textContent=PW_SET?(STEALTH_PW?"unlocked":"locked"):"no password";
-  el.className="tag "+(PW_SET?(STEALTH_PW?"ok":"no"):"");}
+  const el=$("#lockState");el.textContent=PW_SET?(STEALTH_PW?"unlocked":"locked"):"open · no password";
+  el.className="tag "+(PW_SET?(STEALTH_PW?"ok":"no"):"cy");}
 async function doUnlock(){const pw=$("#unlockPw").value;const r=await jpost(MB+"/stealth/unlock",{password:pw});
   if(r&&r.ok){STEALTH_PW=pw;$("#unlockPw").value="";toast("Unlocked","ok");checkLock();}else toast("Wrong stealth password","bad");}
 async function setStealthPw(){const nw=$("#pwNew").value;if(nw.length<4)return toast("Password too short (min 4)","bad");
   const r=await jpost(MB+"/stealth/password",{password:nw,current:STEALTH_PW});
   toast(r&&r.ok?"Stealth password saved":("Failed: "+((r&&r.error)||"error")),r&&r.ok?"ok":"bad");
   if(r&&r.ok){STEALTH_PW=nw;$("#pwNew").value="";checkLock();}}
+function pwGuard(r){if(r&&r.locked){toast("Locked — enter the stealth password first","bad");checkLock();return true;}return false;}
 
-async function loadIdentity(){
-  const r=await jget(MB+"/stealth/identity");if(!r)return;
+/* ---- USB identity ---- */
+async function loadIdentity(){const r=await jget(MB+"/stealth/identity");if(!r)return;
   PRESETS=r.presets||{};const cur=r.current||{};const box=$("#presets");box.innerHTML="";
-  Object.entries(PRESETS).forEach(([k,v])=>{
-    const d=document.createElement("div");d.className="preset"+(cur.preset===k?" sel":"");d.dataset.k=k;
+  Object.entries(PRESETS).forEach(([k,v])=>{const d=document.createElement("div");
+    d.className="preset"+(cur.preset===k?" sel":"");d.dataset.k=k;
     d.innerHTML=`<b>${v.label}</b><span class="vf ${v.verified?'yes':'no'}">${v.verified?'✓ verified':'⚠ unverified'}</span>`;
     d.onclick=()=>selectPreset(k);box.appendChild(d);});
   $("#vid").value=toHex(cur.vendor_id);$("#pid").value=toHex(cur.product_id);
   $("#mfr").value=cur.manufacturer||"";$("#prod").value=cur.product||"";$("#serial").value=cur.serial||"";
   $("#safe").value=String(!!cur.safe_mode);
-  $("#identInfo").innerHTML=`<div class="kv"><span class="k">Label</span><span class="v">${cur.label||'—'}</span></div>
-    <div class="kv"><span class="k">VID:PID</span><span class="v">${toHex(cur.vendor_id)}:${toHex(cur.product_id)}</span></div>
-    <div class="kv"><span class="k">Serial</span><span class="v">${cur.serial||'—'}</span></div>
-    <div class="kv"><span class="k">Verified</span><span class="v">${cur.verified?'<span class="tag ok">yes</span>':'<span class="tag no">no</span>'}</span></div>`;
-}
+  $("#stIdent").textContent=(cur.label||"—")+" · "+toHex(cur.vendor_id)+":"+toHex(cur.product_id);}
 function selectPreset(k){document.querySelectorAll(".preset").forEach(x=>x.classList.toggle("sel",x.dataset.k===k));
-  const v=PRESETS[k];if(!v)return;$("#vid").value=toHex(v.vendor_id);$("#pid").value=toHex(v.product_id);$("#mfr").value=v.manufacturer||"";$("#prod").value=v.product||"";
-  $("#verifyNote").textContent=v.verified?"":"⚠ This preset is researched but not hardware-verified against a real device descriptor.";}
+  const v=PRESETS[k];if(!v)return;$("#verifyNote").textContent=v.verified?"":"⚠ Researched preset, not hardware-verified against a real descriptor.";}
 function selectedPreset(){const el=document.querySelector(".preset.sel");return el?el.dataset.k:null;}
-function pwGuard(r){if(r&&r.locked){toast("Locked — enter the stealth password first","bad");checkLock();return true;}return false;}
 async function applyIdentity(){toast("Applying identity — rebuilding gadget…");
   const r=await jpost(MB+"/stealth/identity",{preset:selectedPreset(),serial:$("#serial").value||null,vendor_id:$("#vid").value,product_id:$("#pid").value,manufacturer:$("#mfr").value,product:$("#prod").value,password:STEALTH_PW});
   if(pwGuard(r))return;toast(r.ok?"Identity applied":("Apply failed: "+(r.error||r.detail||"error")),r.ok?"ok":"bad");loadIdentity();loadStatus();}
+async function randomizeIdentity(){toast("Spoofing a random identity…");
+  const r=await jpost(MB+"/stealth/randomize",{password:STEALTH_PW});if(pwGuard(r))return;
+  toast(r.ok?("Randomized → "+(r.applied&&r.applied.manufacturer)+" "+(r.applied&&toHex(r.applied.vendor_id))):"Failed",r.ok?"ok":"bad");loadIdentity();loadStatus();}
 async function randSerial(){const r=await jpost(MB+"/stealth/serial/random",{password:STEALTH_PW});if(pwGuard(r))return;toast(r.ok?("Serial → "+r.serial):"Failed",r.ok?"ok":"bad");loadIdentity();}
 async function setSafe(){const on=$("#safe").value==="true";const r=await jpost(MB+"/stealth/safe-mode",{on,password:STEALTH_PW});if(pwGuard(r))return;toast("Safe mode "+(on?"enabled":"disabled"),"ok");}
+
+/* ---- MAC ---- */
 async function macApply(random){const r=await jpost(MB+"/net/mac",{iface:$("#macIf").value,mac:$("#macVal").value,random});
-  toast(r.ok?("MAC → "+r.mac):("MAC failed: "+(r.detail||r.error||"")),r.ok?"ok":"bad");$("#macCur").textContent=r.mac||"—";}
-async function loadStatus(){const s=await jget(MB+"/stealth/status");if(s){$("#stOtg").textContent=s.kvmd_otg||"—";$("#stOv").textContent=s.override_present?"yes":"no";}
-  const n=await jget(MB+"/net/status");if(n){$("#stTs").textContent=n.tailscale&&n.tailscale.up?"up":"down";if(n.mac&&n.mac.mac)$("#macCur").textContent=n.mac.mac;}}
-loadIdentity();loadStatus();checkLock();
+  toast(r.ok?("MAC → "+r.mac):("MAC failed: "+(r.detail||r.error||"")),r.ok?"ok":"bad");if(r.mac){$("#macCur").textContent=r.mac;$("#stMac").textContent=r.mac;}}
+
+/* ---- EDID ---- */
+async function loadEdid(){const r=await jget(MB+"/net/edid");if(!r)return;const sel=$("#edidPreset");
+  if(r.presets&&r.presets.length&&sel.options.length<=0){sel.innerHTML=r.presets.map(p=>`<option value="${p}">${p}</option>`).join("");if(r.presets.includes("v4mini"))sel.value="v4mini";}
+  $("#edidCur").textContent=r.current||"—";}
+async function edidApply(){const p=$("#edidPreset").value;if(!p)return;if(!confirm("Apply EDID preset '"+p+"'? Captured video will blink."))return;
+  toast("Applying EDID…");const r=await jpost(MB+"/net/edid",{preset:p});toast(r&&r.ok?"EDID applied":"EDID failed",r&&r.ok?"ok":"bad");setTimeout(loadEdid,1600);}
+
+/* ---- network / anonymity ---- */
+async function ts(a){const r=await jpost(MB+"/net/tailscale",{action:a});toast("Tailscale "+a,(r&&r.ok)?"ok":"");loadStatus();}
+async function tsInstall(){toast("Installing Tailscale…");const r=await jpost(MB+"/net/tailscale/install");toast(r&&r.ok?(r.already?"Already installed":"Installed"):"Install failed",r&&r.ok?"ok":"bad");}
+async function funnel(on){toast("Configuring Funnel…");const r=await jpost(MB+"/net/tailscale/funnel",{on});toast(r&&r.ok?("Funnel "+(on?"on":"off")):"Funnel: "+((r&&(r.error||r.detail))||"failed"),r&&r.ok?"ok":"bad");}
+async function lockdown(on){const r=await jpost(MB+"/net/lockdown",{on});toast("Lockdown "+(on?"on":"off"),(r&&r.ok)?"ok":"");}
+async function duckdns(){const r=await jpost(MB+"/net/duckdns",{domain:$("#ddDomain").value,token:$("#ddToken").value});toast(r.ok?"DuckDNS updated":"DuckDNS: "+(r.error||"error"),r.ok?"ok":"bad");}
+
+/* ---- wifi ---- */
+async function wifiScan(){$("#wScan").textContent="Scanning…";const r=await jget(MB+"/net/wifi/scan");
+  if(!r||!r.ok){$("#wScan").textContent="Scan unavailable";return;}
+  $("#wNets").innerHTML=(r.networks||[]).map(n=>`<option value="${n.ssid}">`).join("");
+  $("#wScan").textContent=(r.networks&&r.networks.length)?("Found: "+r.networks.map(n=>n.ssid+(n.secure?" 🔒":"")).join(", ")):"No networks found";}
+async function wifiConnect(){const r=await jpost(MB+"/net/wifi",{ssid:$("#wSsid").value,password:$("#wPw").value});toast(r.ok?"Wi-Fi updated":"Wi-Fi: "+(r.error||"pending"),r.ok?"ok":"");}
+
+/* ---- backup / restore ---- */
+async function backup(){const r=await jget(MB+"/stealth/backup");if(!r||!r.ok)return toast("Backup failed","bad");
+  const blob=new Blob([JSON.stringify(r,null,2)],{type:"application/json"});const a=document.createElement("a");
+  a.href=URL.createObjectURL(blob);a.download="magicbridge-config-"+(r.ts||Date.now())+".json";a.click();
+  $("#cfgMsg").textContent="Backup downloaded.";toast("Backup downloaded","ok");}
+async function restore(input){const f=input.files[0];if(!f)return;
+  try{const data=JSON.parse(await f.text());const r=await jpost(MB+"/stealth/restore",{config:data.config||data,password:STEALTH_PW});
+    if(pwGuard(r))return;toast(r&&r.ok?"Config restored":"Restore failed",r&&r.ok?"ok":"bad");$("#cfgMsg").textContent=r&&r.ok?"Restored: "+(r.restored||[]).join(", "):"";loadIdentity();loadStatus();}
+  catch(e){toast("Invalid backup file","bad");}}
+
+/* ---- logs / status ---- */
+async function loadLogs(){$("#logbox").textContent="loading…";const r=await jget(MB+"/net/logs?n=100");$("#logbox").textContent=(r&&r.text)||"No logs returned.";}
+async function loadStatus(){const s=await jget(MB+"/stealth/status");if(s){$("#stOtg").textContent=s.kvmd_otg||"—";}
+  const n=await jget(MB+"/net/status");if(n){const up=n.tailscale&&n.tailscale.up;$("#tsState").textContent=up?"up":"down";$("#stTs").textContent=up?"up":"down";
+    if(n.mac&&n.mac.mac){$("#macCur").textContent=n.mac.mac;$("#stMac").textContent=n.mac.mac;}
+    const d=n.duckdns||{};if(d.domain)$("#ddDomain").value=d.domain;}}
+loadIdentity();loadEdid();loadStatus();checkLock();
 </script>
 </body>
 </html>

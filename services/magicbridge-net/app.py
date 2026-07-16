@@ -51,6 +51,22 @@ async def health(_):
     return web.json_response({"ok": True, "service": "magicbridge-net"})
 
 
+async def sysinfo(_):
+    """GET /mb/net/sys — uptime/load/hostname (kvmd's /api/info doesn't expose uptime)."""
+    up = None
+    try:
+        up = float(open("/proc/uptime").read().split()[0])
+    except Exception:
+        pass
+    load = None
+    try:
+        load = os.getloadavg()
+    except Exception:
+        pass
+    return web.json_response({"ok": True, "uptime": up, "load": load,
+                              "hostname": os.uname().nodename})
+
+
 async def status(_):
     ts_rc, ts_out = sh("tailscale", "status", "--json", timeout=8)
     return web.json_response({
@@ -374,6 +390,7 @@ def build_app():
     app = web.Application()
     app.add_routes([
         web.get("/health", health),
+        web.get("/sys", sysinfo),
         web.get("/status", status),
         web.post("/duckdns", duckdns_update),
         web.post("/lockdown", lockdown),

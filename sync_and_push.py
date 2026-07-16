@@ -18,11 +18,9 @@ LOG = os.path.join(BASE, "sync_and_push_log.txt")
 PROJ = r"C:\Users\razzr\Claude\Projects\MagicBridge\MagicBridgeV2"
 EDEV = r"E:\Startup\MagicbridgeV2"
 # session-only artifacts we never want in git (logs, pulled temp copies, one-off diagnostics)
-EXCLUDE_FILES = ["*_log.txt", "_*.html", "inspect_git.py", "inspect_pi.py",
-                 "fix_perms.py", "fix_meta.py", "check_kvmd.py", "deploy_nginx.py",
-                 "deploy_index.py", "pull_assets.py", "pull_check.py", "get_janus.py",
-                 "validate_backend.py", "rebrand_login.py", "inspect_default.py",
-                 "rebrand_native.py", "find_terminal.py"]
+EXCLUDE_FILES = ["*_log.txt", "_*.html", "inspect_*.py", "fix_*.py", "check_*.py",
+                 "pull_*.py", "get_*.py", "validate*.py", "rebrand_*.py", "find_*.py",
+                 "deploy_nginx.py"]
 
 
 def log(m):

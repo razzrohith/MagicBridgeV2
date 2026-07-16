@@ -193,7 +193,19 @@ button.btn.danger:hover{background:rgba(229,83,75,.1)}
           <h3>Paste to target</h3>
           <p class="sub">Type text straight onto the remote machine (via the USB keyboard).</p>
           <label class="f"><span>Text</span><input id="paste_txt" placeholder="type text to send…"></label>
-          <div class="btns"><button class="btn" onclick="pasteText()">Send keystrokes</button></div>
+          <div class="row" style="margin-bottom:12px">
+            <label class="f" style="flex:0 0 auto"><span>Style</span>
+              <select id="typeStyle" style="width:auto">
+                <option value="human">Human-like (realistic delays)</option>
+                <option value="instant">Instant</option></select></label>
+            <label class="f" style="flex:0 0 auto"><span>Speed</span>
+              <select id="typeSpeed" style="width:auto">
+                <option value="1">Normal</option><option value="0.5">Fast</option>
+                <option value="2">Careful</option></select></label>
+          </div>
+          <div class="btns"><button class="btn" id="pasteBtn" onclick="pasteText()">Send keystrokes</button>
+            <button class="btn ghost" id="pasteStopBtn" onclick="stopTyping()" style="display:none">Stop</button></div>
+          <div id="typeProg" class="hint" style="margin-top:8px"></div>
         </div>
         <div class="card">
           <h3>Video</h3>
@@ -506,10 +518,10 @@ function kvmConnect(){
   kvmWs.onmessage=(ev)=>{if(typeof ev.data==="string"){try{const m=JSON.parse(ev.data);kvmState(m.event_type,m.event);}catch(e){}}};
 }
 function kvmState(t,e){
-  if(t==="streamer"&&e){const s=e.state||{};const enc=s.encoder&&s.encoder.type;
-    if(enc)$("#strEnc").textContent=enc;
-    if(s.resolution)$("#strRes").textContent=s.resolution.width+"×"+s.resolution.height;
-    if(s.stream&&s.stream.clients_stat){const ids=Object.keys(s.stream.clients_stat);if(ids.length)$("#strFps").textContent=s.stream.clients_stat[ids[0]].fps+" fps";}}
+  if(t==="streamer"&&e){const st=e.streamer||e.state||e;
+    if(st.encoder&&st.encoder.type&&!(transport==="webrtc"&&webrtcUp))$("#strEnc").textContent=st.encoder.type;
+    const src=st.source||st;if(src.resolution)$("#strRes").textContent=src.resolution.width+"×"+src.resolution.height;
+    if(st.stream&&st.stream.clients_stat){const ids=Object.keys(st.stream.clients_stat);if(ids.length)$("#strFps").textContent=st.stream.clients_stat[ids[0]].fps+" fps";}}
   if(t==="hid"&&e){if(e.mouse&&e.mouse.absolute!==undefined){kvmAbs=e.mouse.absolute;const sel=$("#mouseMode");if(sel&&!kvmModeBusy)sel.value=kvmAbs?"usb":"usb_rel";}
     const on=e.online&&!e.busy;const locked=document.pointerLockElement===$("#streamBox");
     setLed("ledKbd",(kvmCap||locked)?(on?"g":"y"):"");setLed("ledMouse",(kvmCap||locked)?(on?"g":"y"):"");}
@@ -549,11 +561,61 @@ async function kvmSetMouseMode(){const out=$("#mouseMode").value;kvmModeBusy=tru
   finally{setTimeout(()=>{kvmModeBusy=false;},600);}}
 function kvmFullscreen(){const b=$("#streamBox");(b.requestFullscreen||b.webkitRequestFullscreen||function(){}).call(b);}
 function combo(codes){codes.forEach(c=>sendKey(c,true));setTimeout(()=>codes.slice().reverse().forEach(c=>sendKey(c,false)),80);toast("Sent "+codes.join(" + "));}
-async function pasteText(){const t=$("#paste_txt").value;if(!t)return;const r=await fetch(KVMD+"/hid/print?limit=0",{method:"POST",credentials:"include",body:t});toast(r.ok?"Sent to target":"Send failed",r.ok?"ok":"bad");}
+/* ===== Human-like typing — MagicBridge signature. Types char-by-char over the
+   HID socket with randomized inter-key delays, longer pauses after punctuation,
+   and the occasional "thinking" pause, so paste doesn't look machine-instant. ===== */
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+const rnd=(a,b)=>a+Math.random()*(b-a);
+let typingAbort=false;
+const KEYMAP=(function(){const m={};
+  "abcdefghijklmnopqrstuvwxyz".split("").forEach(c=>m[c]={code:"Key"+c.toUpperCase(),shift:false});
+  "abcdefghijklmnopqrstuvwxyz".split("").forEach(c=>m[c.toUpperCase()]={code:"Key"+c.toUpperCase(),shift:true});
+  "0123456789".split("").forEach((c,i)=>m[c]={code:"Digit"+c,shift:false});
+  const sh={"!":"Digit1","@":"Digit2","#":"Digit3","$":"Digit4","%":"Digit5","^":"Digit6","&":"Digit7","*":"Digit8","(":"Digit9",")":"Digit0",
+    "_":"Minus","+":"Equal","{":"BracketLeft","}":"BracketRight","|":"Backslash",":":"Semicolon","\"":"Quote","<":"Comma",">":"Period","?":"Slash","~":"Backquote"};
+  for(const k in sh)m[k]={code:sh[k],shift:true};
+  const pl={"-":"Minus","=":"Equal","[":"BracketLeft","]":"BracketRight","\\":"Backslash",";":"Semicolon","'":"Quote",",":"Comma",".":"Period","/":"Slash","`":"Backquote"};
+  for(const k in pl)m[k]={code:pl[k],shift:false};
+  m[" "]={code:"Space",shift:false};m["\t"]={code:"Tab",shift:false};m["\n"]={code:"Enter",shift:false};m["\r"]={code:"Enter",shift:false};
+  return m;})();
+async function typeHuman(text,mult){
+  typingAbort=false;$("#pasteStopBtn").style.display="";$("#pasteBtn").disabled=true;
+  let sent=0;const total=text.length;
+  for(const ch of text){
+    if(typingAbort){$("#typeProg").textContent="Stopped at "+sent+"/"+total;break;}
+    const k=KEYMAP[ch];
+    if(k){
+      if(k.shift)sendKey("ShiftLeft",true);
+      sendKey(k.code,true);await sleep(rnd(8,26)*mult);sendKey(k.code,false);
+      if(k.shift)sendKey("ShiftLeft",false);
+    }
+    sent++;
+    let d=rnd(40,130)*mult;
+    if(ch===" ")d+=rnd(10,70)*mult;                       // brief pause between words
+    if(".,!?;:".includes(ch))d+=rnd(80,220)*mult;          // pause after punctuation
+    if(Math.random()<0.05)d+=rnd(180,520)*mult;            // occasional "thinking" pause
+    if(sent%12===0)$("#typeProg").textContent="Typing… "+sent+"/"+total;
+    await sleep(d);
+  }
+  if(!typingAbort)$("#typeProg").textContent="Done — "+sent+" characters typed";
+  $("#pasteStopBtn").style.display="none";$("#pasteBtn").disabled=false;
+}
+function stopTyping(){typingAbort=true;}
+async function sendString(t){
+  if(!t)return;
+  const style=$("#typeStyle")?$("#typeStyle").value:"human";
+  if(style==="human"){
+    if(!wsReady())return toast("Not connected to the target yet","bad");
+    const mult=parseFloat(($("#typeSpeed")||{value:"1"}).value)||1;
+    await typeHuman(t,mult);toast("Typed "+t.length+" characters (human-like)","ok");
+  }else{
+    const r=await fetch(KVMD+"/hid/print?limit=0",{method:"POST",credentials:"include",body:t});
+    toast(r.ok?("Sent "+t.length+" characters"):"Send failed",r.ok?"ok":"bad");
+  }
+}
+async function pasteText(){await sendString($("#paste_txt").value);}
 async function pasteClipboard(){try{const t=await navigator.clipboard.readText();if(!t)return toast("Clipboard is empty");
-  const r=await fetch(KVMD+"/hid/print?limit=0",{method:"POST",credentials:"include",body:t});
-  toast(r.ok?("Pasted "+t.length+" chars to target"):"Paste failed",r.ok?"ok":"bad");}
-  catch(e){toast("Clipboard blocked — click the page once, then retry","bad");}}
+  await sendString(t);}catch(e){toast("Clipboard blocked — click the page once, then retry","bad");}}
 /* --- on-screen keyboard: sends keys over the kvmd WS without capturing your real keyboard --- */
 const OSK_MODS=new Set();
 function oskLayout(){const F=[];for(let i=1;i<=12;i++)F.push(["F"+i,"F"+i]);
@@ -703,12 +765,21 @@ async function totpDisable(){if(!confirm("Disable two-factor login?"))return;con
 
 /* top bar */
 async function refreshTop(){const r=await jget(KVMD+"/info");const d=res(r);const hw=d.hw||{};
-  const t=hw.health&&hw.health.temp?hw.health.temp.cpu:null;$("#s_temp").textContent=t?t+"°":"—";
-  const up=(d.system&&d.system.uptime)||(hw.health&&hw.health.uptime);$("#s_up").textContent=fmtUp(up);
-  const s=await jget(KVMD+"/streamer");$("#s_stream").textContent=(res(s).state&&res(s).state.encoder&&res(s).state.encoder.type)||"—";
+  const t=hw.health&&hw.health.temp?hw.health.temp.cpu:null;$("#s_temp").textContent=t?(+t).toFixed(1)+"°":"—";
+  const sys=await jget(MB+"/net/sys");$("#s_up").textContent=(sys&&sys.uptime)?fmtUp(sys.uptime):"—";
+  updateStreamStats();
   const a=await jget(KVMD+"/atx");const ad=res(a);const on=ad.leds&&ad.leds.power;$("#s_power").textContent=on?"on":"off";
   $("#atx_led").textContent=on?"on":"off";$("#atx_hdd").textContent=(ad.leds&&ad.leds.hdd)?"active":"idle";}
-function fmtUp(s){if(!s)return "—";s=+s;const h=Math.floor(s/3600),m=Math.floor(s%3600/60);return h+"h "+m+"m";}
+async function updateStreamStats(){const st=(res(await jget(KVMD+"/streamer")).streamer)||{};
+  const enc=st.encoder&&st.encoder.type;const live=(transport==="webrtc"&&webrtcUp);
+  if($("#strEnc")&&!live)$("#strEnc").textContent=enc||"—";
+  if($("#s_stream"))$("#s_stream").textContent=live?"H.264":(enc||"—");
+  const src=st.source||{};if(src.resolution&&$("#strRes"))$("#strRes").textContent=src.resolution.width+"×"+src.resolution.height;
+  let fps=null;if(st.stream&&st.stream.clients_stat){const ids=Object.keys(st.stream.clients_stat);if(ids.length)fps=st.stream.clients_stat[ids[0]].fps;}
+  if(fps==null&&src.captured_fps!=null)fps=src.captured_fps;
+  if(fps!=null&&$("#strFps"))$("#strFps").textContent=fps+" fps";}
+function fmtUp(s){if(!s)return "—";s=+s;const d=Math.floor(s/86400),h=Math.floor(s%86400/3600),m=Math.floor(s%3600/60);
+  return (d?d+"d ":"")+h+"h "+m+"m";}
 
 kvmReloadStream();kvmConnect();refreshTop();loadMsd();loadStreamCtl();loadGpio();setInterval(refreshTop,5000);
 </script>
