@@ -24,7 +24,7 @@ LOG = os.path.join(BASE, "deploy_all_log.txt")
 HOST, USER, PASS = "172.16.20.209", "root", "root"
 REMOTE_ROOT = "/opt/magicbridge"
 # local subtrees to mirror onto the Pi (relative to BASE)
-TREES = ["web", "services", "nginx", "branding", "kvmd-overrides", "systemd"]
+TREES = ["web", "services", "nginx", "branding", "kvmd-overrides", "systemd", "provision"]
 # services to restart after upload so new endpoints/behaviour take effect
 RESTART = ["magicbridge-net", "magicbridge-stealth", "magicbridge-agent"]
 

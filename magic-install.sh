@@ -187,6 +187,12 @@ phase6_enable() {
   for svc in magicbridge-net magicbridge-stealth magicbridge-agent; do
     [ -f "/etc/systemd/system/${svc}.service" ] && run "systemctl enable --now '${svc}.service' || true"
   done
+  # WiFi provisioning captive portal — raises a setup AP only when the device
+  # boots with no network. Enabled (runs at boot) but NOT started now, so it
+  # never disrupts the current connection.
+  run "chmod +x '$INSTALL_ROOT/provision/mb-portal.sh' 2>/dev/null || true"
+  run "pacman -Sy --noconfirm --needed hostapd dnsmasq 2>/dev/null || true"
+  [ -f /etc/systemd/system/mb-portal.service ] && run "systemctl enable mb-portal.service 2>/dev/null || true"
   run "systemctl try-restart kvmd || true"
   run "systemctl restart kvmd-oled 2>/dev/null || true"
   ok "MagicBridgeV2 enabled"

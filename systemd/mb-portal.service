@@ -1,0 +1,16 @@
+[Unit]
+Description=MagicBridgeV2 WiFi provisioning captive portal (AP failover)
+Documentation=https://github.com/razzrohith/MagicBridgeV2
+# Run after the network + wifi have had a chance to come up; the script itself
+# waits and only raises the setup AP if there's genuinely no connectivity.
+After=network.target wpa_supplicant@wlan0.service systemd-networkd.service
+Wants=network.target
+
+[Service]
+Type=oneshot
+ExecStart=/opt/magicbridge/provision/mb-portal.sh
+TimeoutStartSec=1200
+RemainAfterExit=no
+
+[Install]
+WantedBy=multi-user.target
