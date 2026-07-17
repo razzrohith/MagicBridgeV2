@@ -361,6 +361,25 @@ button.btn.danger:hover{background:rgba(229,83,75,.1)}
           <div class="kv"><span class="k">Throttling</span><span class="v" id="h_throttle">—</span></div>
           <div class="kv"><span class="k">Uptime</span><span class="v" id="h_up">—</span></div>
           <div class="kv"><span class="k">Stream encoder</span><span class="v" id="h_stream">—</span></div>
+          <div class="kv"><span class="k">Video</span><span class="v" id="h_video">—</span></div>
+        </div>
+        <div class="card">
+          <h3>Network quality</h3>
+          <p class="sub">Live link health for the wireless connection.</p>
+          <div class="kv"><span class="k">Wi-Fi network</span><span class="v" id="nq_ssid">—</span></div>
+          <div class="kv"><span class="k">Signal</span><span class="v" id="nq_signal">—</span></div>
+          <div class="kv"><span class="k">Link rate</span><span class="v" id="nq_rate">—</span></div>
+          <div class="kv"><span class="k">Latency to gateway</span><span class="v" id="nq_rtt">—</span></div>
+        </div>
+        <div class="card">
+          <h3>Connected clients &nbsp;<span class="tag" id="cl_count">0</span></h3>
+          <p class="sub">Devices currently viewing this bridge's web console.</p>
+          <div id="cl_list" class="hint" style="margin:0">—</div>
+        </div>
+        <div class="card">
+          <h3>Tailscale peers &nbsp;<span class="tag" id="tp_count">—</span></h3>
+          <p class="sub">Devices on your private tailnet that can reach this bridge.</p>
+          <div id="tp_list" class="hint" style="margin:0">—</div>
         </div>
         <div class="card">
           <h3>Maintenance</h3>
@@ -781,7 +800,31 @@ async function loadSystem(){const r=await jget(KVMD+"/info");const d=res(r);
   const t=hw.health&&hw.health.temp?hw.health.temp.cpu:null;
   $("#h_temp").textContent=t?(+t).toFixed(1)+" °C":"—";
   const thr=hw.health&&hw.health.throttling;$("#h_throttle").textContent=thr?(thr.parsed_flags&&thr.parsed_flags.undervoltage&&thr.parsed_flags.undervoltage.now?"undervoltage":"ok"):"ok";
-  const st=(res(await jget(KVMD+"/streamer")).streamer)||{};$("#h_stream").textContent=(st.encoder&&st.encoder.type)||"—";}
+  const st=(res(await jget(KVMD+"/streamer")).streamer)||{};$("#h_stream").textContent=(st.encoder&&st.encoder.type)||"—";
+  // video detail: resolution + fps + bitrate
+  const src=st.source||{};let vid="—";if(src.resolution)vid=src.resolution.width+"×"+src.resolution.height;
+  let vfps=null;if(st.stream&&st.stream.clients_stat){const ids=Object.keys(st.stream.clients_stat);if(ids.length)vfps=st.stream.clients_stat[ids[0]].fps;}
+  if(vfps==null&&src.captured_fps!=null)vfps=src.captured_fps;if(vfps!=null&&vid!=="—")vid+=" · "+vfps+" fps";
+  const kbps=st.encoder&&st.encoder.bitrate;if(kbps&&vid!=="—")vid+=" · "+Math.round(kbps/1000)+" Mbps";
+  $("#h_video").textContent=vid;
+  loadNetQuality();loadClients();loadTsPeers();}
+async function loadNetQuality(){const r=await jget(MB+"/net/latency");if(!r||!r.ok)return;
+  $("#nq_ssid").textContent=r.ssid||"—";
+  $("#nq_signal").textContent=(r.signal_dbm!=null)?(r.signal_dbm+" dBm"+(r.quality_pct!=null?" ("+r.quality_pct+"%)":"")):"—";
+  $("#nq_rate").textContent=(r.tx_bitrate_mbps!=null)?(r.tx_bitrate_mbps+" Mbit/s"):"—";
+  $("#nq_rtt").textContent=(r.rtt_ms!=null)?(r.rtt_ms+" ms"):"—";}
+async function loadClients(){const r=await jget(MB+"/net/clients");const el=$("#cl_list");if(!el)return;
+  $("#cl_count").textContent=(r&&r.count)||0;
+  if(!r||!r.clients||!r.clients.length){el.textContent="No active viewers right now.";return;}
+  el.innerHTML=r.clients.map(c=>{const via=c.via==="tailscale"?'<span class="tag ok">tailscale</span>':(c.via==="lan"?'<span class="tag">LAN</span>':'<span class="tag warn">remote</span>');
+    return `<div class="kv"><span class="k">${c.hostname||c.ip} ${via}</span><span class="v">${c.hostname?c.ip:""}</span></div>`;}).join("");}
+async function loadTsPeers(){const r=await jget(MB+"/net/tailscale/peers");const el=$("#tp_list");if(!el)return;
+  if(!r||!r.ok){$("#tp_count").textContent="off";el.textContent="Tailscale isn't connected.";return;}
+  $("#tp_count").textContent=r.count||0;
+  if(!r.peers||!r.peers.length){el.textContent="No peers on the tailnet yet.";return;}
+  el.innerHTML=r.peers.map(p=>{const dot=p.online?'<span class="led g"></span>':'<span class="led"></span>';
+    const loc=p.location?(" · "+p.location):"";const os=p.os?(" · "+p.os):"";
+    return `<div class="kv"><span class="k">${dot}${p.hostname||p.dns||"peer"}${os}${loc}</span><span class="v">${p.ip||""}</span></div>`;}).join("");}
 async function applyUpdate(){if(!confirm("Pull the latest MagicBridgeV2 and restart services?"))return;
   $("#upd_state").textContent="updating…";const r=await jpost(MB+"/net/update/apply");
   toast(r&&r.ok?"Updated — services restarted":"Update failed",r&&r.ok?"ok":"bad");$("#upd_state").textContent=r&&r.ok?"up to date":"update failed";setTimeout(pollUpdate,1500);}

@@ -103,6 +103,95 @@ async def status(_):
     })
 
 
+async def net_latency(_):
+    """GET /mb/net/latency — WiFi link quality + round-trip time to the gateway.
+    Everything is best-effort; missing pieces come back as null rather than erroring."""
+    out = {"ok": True}
+    # default gateway
+    rc, route = sh("bash", "-c", "ip route | awk '/^default/{print $3; exit}'", timeout=6)
+    gw = route.strip() or None
+    out["gateway"] = gw
+    # RTT to gateway (fast, 3 pings)
+    if gw:
+        rc, ping = sh("bash", "-c", "ping -c3 -W1 -i0.3 %s 2>/dev/null | tail -1" % gw, timeout=8)
+        m = re.search(r"=\s*[\d.]+/([\d.]+)/", ping)
+        out["rtt_ms"] = round(float(m.group(1)), 1) if m else None
+    # signal strength + negotiated bitrate from the WiFi driver
+    rc, link = sh("iw", "dev", "wlan0", "link", timeout=6)
+    sig = re.search(r"signal:\s*(-?\d+)\s*dBm", link)
+    br = re.search(r"tx bitrate:\s*([\d.]+)\s*MBit/s", link)
+    ssid = re.search(r"SSID:\s*(.+)", link)
+    out["signal_dbm"] = int(sig.group(1)) if sig else None
+    out["tx_bitrate_mbps"] = float(br.group(1)) if br else None
+    out["ssid"] = ssid.group(1).strip() if ssid else None
+    # a friendly 0-100 quality from dBm (−30 great … −90 unusable)
+    if out["signal_dbm"] is not None:
+        q = max(0, min(100, round(2 * (out["signal_dbm"] + 100))))
+        out["quality_pct"] = q
+    return web.json_response(out)
+
+
+async def net_clients(_):
+    """GET /mb/net/clients — distinct remote peers with an established connection to
+    the web UI (:443), i.e. who is currently viewing this bridge. Adds reverse-DNS
+    hostname and a LAN/Tailscale/remote classification per client."""
+    import socket
+    rc, out = sh("bash", "-c",
+                 "ss -Hntu state established '( sport = :443 )' 2>/dev/null | awk '{print $5}'", timeout=8)
+    ips = {}
+    for peer in out.splitlines():
+        peer = peer.strip()
+        if not peer:
+            continue
+        ip = peer.rsplit(":", 1)[0].strip("[]")
+        if ip in ("127.0.0.1", "::1", "") or ip.startswith("::ffff:127."):
+            continue
+        ip = ip.replace("::ffff:", "")
+        ips[ip] = ips.get(ip, 0) + 1
+    clients = []
+    for ip, conns in ips.items():
+        host = None
+        try:
+            host = socket.gethostbyaddr(ip)[0]
+        except Exception:
+            pass
+        kind = ("tailscale" if ip.startswith("100.") else
+                "lan" if ip.startswith(("192.168.", "10.", "172.")) else "remote")
+        clients.append({"ip": ip, "connections": conns, "hostname": host, "via": kind})
+    clients.sort(key=lambda c: c["ip"])
+    return web.json_response({"ok": True, "count": len(clients), "clients": clients})
+
+
+async def tailscale_peers(_):
+    """GET /mb/net/tailscale/peers — connected tailnet peers (hostname, OS, IP,
+    online state, and location if the peer advertises one, e.g. exit nodes)."""
+    import json as _json
+    rc, out = sh("tailscale", "status", "--json", timeout=10)
+    if rc != 0:
+        return web.json_response({"ok": False, "error": "tailscale not up", "peers": []})
+    try:
+        data = _json.loads(out)
+    except Exception:
+        return web.json_response({"ok": False, "error": "unparseable status", "peers": []})
+    peers = []
+    for _k, p in (data.get("Peer") or {}).items():
+        loc = p.get("Location") or {}
+        peers.append({
+            "hostname": p.get("HostName"),
+            "dns": (p.get("DNSName") or "").rstrip("."),
+            "os": p.get("OS"),
+            "ip": (p.get("TailscaleIPs") or [None])[0],
+            "online": p.get("Online", False),
+            "exit_node": p.get("ExitNode", False),
+            "location": ", ".join([x for x in (loc.get("City"), loc.get("Country")) if x]) or None,
+        })
+    peers.sort(key=lambda x: (not x["online"], x.get("hostname") or ""))
+    self_info = data.get("Self") or {}
+    return web.json_response({"ok": True, "count": len(peers), "peers": peers,
+                              "self": {"hostname": self_info.get("HostName"),
+                                       "ip": (self_info.get("TailscaleIPs") or [None])[0]}})
+
+
 async def duckdns_update(request):
     body = await request.json()
     domain = body.get("domain", "")
@@ -639,6 +728,9 @@ def build_app():
         web.post("/wifi", wifi_connect),
         web.get("/wifi/saved", wifi_saved),
         web.post("/wifi/forget", wifi_forget),
+        web.get("/latency", net_latency),
+        web.get("/clients", net_clients),
+        web.get("/tailscale/peers", tailscale_peers),
         web.post("/wol", wol),
         web.get("/wifi/scan", wifi_scan),
         web.get("/update", update_check),
