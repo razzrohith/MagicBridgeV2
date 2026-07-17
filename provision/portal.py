@@ -130,13 +130,11 @@ def main():
     import time
     srv = ThreadingHTTPServer((AP_IP, PORT), H)
     srv.timeout = 1
-    start = time.time()
+    # Wait indefinitely — the setup hotspot must stay up until someone submits
+    # credentials. mb-portal.sh then verifies the connection and only exits the
+    # provisioning loop once we're actually joined to a real network.
     while not _done["v"]:
         srv.handle_request()
-        # Safety: never block forever. If nobody sets up within 15 min, give up
-        # so mb-portal.sh can tear the AP down and rejoin any saved network.
-        if time.time() - start > 900:
-            break
     # give the browser a moment to render the "connecting" page before teardown
     time.sleep(2)
 

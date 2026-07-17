@@ -8,7 +8,10 @@ Wants=network.target
 
 [Service]
 Type=oneshot
-ExecStart=/opt/magicbridge/provision/mb-portal.sh
+# Run via bash, NOT the script path directly: git checkouts on Windows drop the
+# executable bit, so ExecStart=<script> fails with permission-denied and the
+# service dies with no log. bash doesn't care about the +x bit.
+ExecStart=/bin/bash /opt/magicbridge/provision/mb-portal.sh
 TimeoutStartSec=1200
 RemainAfterExit=no
 
