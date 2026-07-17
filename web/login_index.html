@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>MagicBridgeV2</title>
+    <link rel="apple-touch-icon" sizes="180x180" href="../share/apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="../share/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="../share/favicon-16x16.png">
+    <link rel="manifest" href="../share/site.webmanifest">
+    <meta name="theme-color" content="#0b0e13">
+    <!-- keep the engine stylesheets that power error dialogs / the window manager;
+         only login.css (the stock PiKVM login layout) is dropped and replaced below -->
+    <link rel="stylesheet" href="../share/css/vars.css">
+    <link rel="stylesheet" href="../share/css/main.css">
+    <link rel="stylesheet" href="../share/css/window.css">
+    <link rel="stylesheet" href="../share/css/modal.css">
+    <link rel="stylesheet" href="../share/css/radio.css">
+    <link rel="stylesheet" href="../share/css/user.css">
+    <style>
+      :root{
+        --bg:#0b0e13; --surface:#12161d; --surface2:#171c24; --surface3:#1d232c;
+        --border:#262d38; --border2:#313a47;
+        --text:#e6edf3; --text2:#9aa4b2; --text3:#6b7482;
+        --accent:#5b8cff; --accent2:#3a6fe0; --accent-soft:rgba(91,140,255,.12);
+        --danger:#e5534b;
+      }
+      *{box-sizing:border-box}
+      html,body{margin:0;height:100%}
+      body{
+        background:var(--bg);color:var(--text);
+        font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,Helvetica,Arial,sans-serif;
+        font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased;
+        display:grid;place-items:center;min-height:100vh;padding:20px;
+        background-image:radial-gradient(900px 480px at 15% -10%,rgba(91,140,255,.10),transparent 60%),
+          radial-gradient(700px 420px at 100% 0,rgba(91,140,255,.06),transparent 55%);
+      }
+      .panel{
+        width:100%;max-width:380px;
+        background:rgba(23,28,36,.66);backdrop-filter:blur(20px) saturate(140%);-webkit-backdrop-filter:blur(20px) saturate(140%);
+        border:1px solid rgba(255,255,255,.07);border-radius:16px;padding:30px 28px 26px;
+        box-shadow:0 1px 2px rgba(0,0,0,.4),0 24px 60px rgba(0,0,0,.45);
+      }
+      .brand{display:flex;align-items:center;gap:12px;margin-bottom:22px}
+      .logo{width:38px;height:38px;border-radius:10px;background:linear-gradient(145deg,#2b3442,#171c24);
+        border:1px solid var(--border2);display:grid;place-items:center;font-weight:800;font-size:16px;color:var(--text)}
+      .brand-t b{font-size:16px;letter-spacing:.2px;display:block}
+      .brand-t span{font-size:11px;color:var(--text3);letter-spacing:1.2px;text-transform:uppercase}
+      label{display:block;font-size:11.5px;color:var(--text2);margin:14px 0 6px;letter-spacing:.2px}
+      input{width:100%;background:var(--surface3);border:1px solid var(--border2);color:var(--text);
+        border-radius:9px;padding:11px 12px;font:inherit;font-size:14px;outline:none;transition:border .12s,box-shadow .12s}
+      input::placeholder{color:var(--text3)}
+      input:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+      .remember{display:flex;align-items:center;justify-content:space-between;margin-top:18px;padding-top:16px;border-top:1px solid var(--border)}
+      .remember span.lbl{font-size:11.5px;color:var(--text2);letter-spacing:.2px}
+      .radio-box{display:flex;gap:4px;background:var(--surface3);border:1px solid var(--border2);border-radius:8px;padding:3px}
+      .radio-box input{display:none}
+      .radio-box label{all:unset;cursor:pointer;padding:5px 10px;border-radius:6px;font-size:11.5px;color:var(--text2);margin:0}
+      .radio-box input:checked + label{background:var(--accent);color:#fff}
+      button#login-button{all:unset;box-sizing:border-box;cursor:pointer;display:flex;align-items:center;justify-content:center;
+        width:100%;margin-top:22px;padding:12px;border-radius:9px;font-size:14px;font-weight:600;
+        background:var(--accent);color:#fff;text-align:center;transition:background .12s}
+      button#login-button:hover{background:var(--accent2)}
+      .err{display:none;margin-top:14px;padding:10px 12px;border-radius:8px;background:rgba(229,83,75,.1);
+        border:1px solid rgba(229,83,75,.35);color:var(--danger);font-size:12.5px}
+      .foot{margin-top:18px;text-align:center;font-size:11px;color:var(--text3);letter-spacing:.2px}
+      .noscript{max-width:380px;text-align:center;color:var(--text3);font-size:12px;margin-top:16px;line-height:1.6}
+    </style>
+    <script type="module">import {setRootPrefix} from "../share/js/vars.js";
+      setRootPrefix("../");
+      import {main} from "../share/js/login/main.js";
+      main();
+    </script>
+  </head>
+  <body>
+    <form action="javascript:void(0)" autocomplete="on">
+      <div id="login-box">
+        <div class="panel" id="login">
+          <div class="brand">
+            <div class="logo">M</div>
+            <div class="brand-t"><b id="login-logo">MagicBridgeV2</b><span>KVM over IP</span></div>
+          </div>
+
+          <label for="user-input">Username</label>
+          <input id="user-input" type="text" autocapitalize="off" autocomplete="username" required>
+
+          <label for="passwd-input">Password</label>
+          <input id="passwd-input" type="password" autocapitalize="off" autocomplete="current-password">
+
+          <label for="code-input">2FA code <span style="color:var(--text3);text-transform:none;letter-spacing:0">(if enabled)</span></label>
+          <input id="code-input" type="text" placeholder="6-digit code" autocomplete="one-time-code" inputmode="numeric" pattern="[0-9]*" maxlength="6">
+
+          <div class="remember">
+            <span class="lbl">Stay signed in</span>
+            <div class="radio-box">
+              <input type="radio" id="expire-radio-3600" name="expire-radio" value="3600"/>
+              <label for="expire-radio-3600">1h</label>
+              <input type="radio" id="expire-radio-43200" name="expire-radio" value="43200"/>
+              <label for="expire-radio-43200">12h</label>
+              <input type="radio" id="expire-radio-0" name="expire-radio" value="0" checked="checked"/>
+              <label for="expire-radio-0">Forever</label>
+            </div>
+          </div>
+
+          <button id="login-button">Sign in</button>
+        </div>
+      </div>
+    </form>
+    <div class="foot">MagicBridgeV2 · secure link</div>
+    <noscript>
+      <div class="noscript">This page requires JavaScript to sign in. Please enable it and reload.</div>
+    </noscript>
+  </body>
+</html>

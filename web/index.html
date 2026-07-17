@@ -17,14 +17,17 @@
 html,body{margin:0;height:100%}
 body{background:var(--bg);color:var(--text);
   font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,Helvetica,Arial,sans-serif;
-  font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased}
+  font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased;
+  background-image:radial-gradient(900px 480px at 12% -8%,rgba(91,140,255,.07),transparent 60%),
+    radial-gradient(700px 420px at 100% 0,rgba(91,140,255,.05),transparent 55%);
+  background-attachment:fixed}
 a{color:var(--accent);text-decoration:none}
 ::-webkit-scrollbar{width:10px;height:10px}
 ::-webkit-scrollbar-thumb{background:#20262f;border-radius:6px;border:2px solid var(--bg)}
 
 .app{display:grid;grid-template-columns:230px 1fr;min-height:100vh}
 /* ---- sidebar ---- */
-.side{background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;padding:16px 12px;position:sticky;top:0;height:100vh}
+.side{background:rgba(18,22,29,.66);backdrop-filter:blur(18px) saturate(140%);-webkit-backdrop-filter:blur(18px) saturate(140%);border-right:1px solid var(--border);display:flex;flex-direction:column;padding:16px 12px;position:sticky;top:0;height:100vh}
 .brand{display:flex;align-items:center;gap:11px;padding:6px 8px 18px}
 .logo{width:34px;height:34px;border-radius:9px;background:linear-gradient(145deg,#2b3442,#171c24);border:1px solid var(--border2);
   display:grid;place-items:center;font-weight:800;font-size:15px;color:var(--text);letter-spacing:.5px}
@@ -47,7 +50,7 @@ a{color:var(--accent);text-decoration:none}
   position:sticky;top:0;background:rgba(11,14,19,.85);backdrop-filter:blur(8px);z-index:5}
 .top h1{margin:0;font-size:17px;font-weight:600;letter-spacing:.2px}
 .stats{display:flex;gap:8px;flex-wrap:wrap}
-.stat{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:5px 11px;font-size:12px;color:var(--text2)}
+.stat{background:rgba(23,28,36,.6);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border:1px solid rgba(255,255,255,.06);border-radius:8px;padding:5px 11px;font-size:12px;color:var(--text2)}
 .stat b{color:var(--text);font-weight:600;margin-left:5px}
 .updchip{color:var(--warn);border-color:rgba(217,164,65,.5);font-weight:600;animation:updpulse 1.8s ease-in-out infinite}
 @keyframes updpulse{50%{box-shadow:0 0 0 3px rgba(217,164,65,.18);border-color:var(--warn)}}
@@ -58,7 +61,7 @@ a{color:var(--accent);text-decoration:none}
 .grid{display:grid;gap:16px}
 .cols2{grid-template-columns:repeat(auto-fit,minmax(320px,1fr))}
 .cols3{grid-template-columns:repeat(auto-fit,minmax(230px,1fr))}
-.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:18px;box-shadow:var(--shadow)}
+.card{background:rgba(23,28,36,.62);backdrop-filter:blur(14px) saturate(130%);-webkit-backdrop-filter:blur(14px) saturate(130%);border:1px solid rgba(255,255,255,.06);border-radius:var(--radius);padding:18px;box-shadow:var(--shadow)}
 .card h3{margin:0 0 3px;font-size:14px;font-weight:600}
 .card .sub{color:var(--text2);font-size:12.5px;margin:0 0 15px}
 .card.span{grid-column:1/-1}
@@ -136,8 +139,6 @@ button.btn.danger:hover{background:rgba(229,83,75,.1)}
       <button data-p="network"><svg viewBox="0 0 24 24"><path d="M5 12.5a11 11 0 0 1 14 0M8 15.5a7 7 0 0 1 8 0M2 9.5a16 16 0 0 1 20 0"/><circle cx="12" cy="19" r="1"/></svg>Network</button>
       <button data-p="auto"><svg viewBox="0 0 24 24"><path d="M12 3l2 4 4 .5-3 3 .8 4L12 17l-3.8 1.5.8-4-3-3 4-.5z"/></svg>Automation</button>
       <button data-p="system"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M19 5l-2 2M7 17l-2 2"/></svg>System</button>
-      <div class="lbl">Security</div>
-      <button onclick="location.href='/stealth/'"><svg viewBox="0 0 24 24"><path d="M12 3l7 3v5c0 4.5-3 8-7 10-4-2-7-5.5-7-10V6z"/></svg>Stealth &#8599;</button>
     </nav>
     <div class="foot"><span class="dot"></span><span id="fstatus">online</span> · <span id="fver">v2</span><br>
       <span style="color:var(--text3)">MagicBridgeV2 · secure link</span></div>
@@ -400,8 +401,8 @@ button.btn.danger:hover{background:rgba(229,83,75,.1)}
           <div class="kv"><span class="k">OLED display</span><span class="v"><span class="tag ok">native</span></span></div>
         </div>
         <div class="card span">
-          <h3>Identity &amp; anonymity &nbsp;<span class="tag">view only</span></h3>
-          <p class="sub">What this bridge currently presents to the target machine and the network. To change any of it, open the <a href="/stealth/">Stealth control panel &#8599;</a></p>
+          <h3>Device identity &nbsp;<span class="tag">view only</span></h3>
+          <p class="sub">What this bridge currently presents to the target machine and the network.</p>
           <div class="grid cols3" style="gap:2px 26px">
             <div>
               <div class="kv"><span class="k">Spoofed USB device</span><span class="v" id="id_usb">—</span></div>

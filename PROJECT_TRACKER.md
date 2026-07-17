@@ -84,12 +84,12 @@ Goal: richer, live, read-only telemetry on the main System page.
 
 ---
 
-## 4. Decisions needed from Raj
+## 4. Decisions (locked 2026-07-17, defaults chosen so work isn't blocked — reversible)
 
-- **D1 — Power (ATX):** remove the panel, or keep it hidden/disabled until an ATX cable is present?
-- **D2 — Wake-on-LAN:** keep (if it can wake the target over the current network) or remove?
-- **D3 — Stealth access after hiding the link:** rely on the direct `/stealth/` URL + existing stealth password gate, or add a hidden trigger (e.g. key combo) to reveal it?
-- **D4 — "Power & Media" page fate:** once MSD (and maybe ATX/WoL) are gone, delete the page or fold the survivors into System?
+- **D1 — Power (ATX):** hidden/disabled until an ATX cable is actually detected/wired (not deleted — cheap to re-enable later).
+- **D2 — Wake-on-LAN:** removed. Can't wake anything meaningful over a WiFi-only link with no wired NIC on the target.
+- **D3 — Stealth access:** no nav link in main UI; reachable only via direct `/stealth/` URL, gated by the existing stealth password.
+- **D4 — "Power & Media" page fate:** MSD removed, WoL removed, ATX hidden pending cable detection → page folds into System (or the nav item drops entirely if nothing survives after Phase 2 work lands).
 
 ---
 
