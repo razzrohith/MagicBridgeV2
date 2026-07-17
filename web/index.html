@@ -179,7 +179,7 @@ button.btn.danger:hover{background:rgba(229,83,75,.1)}
           <div class="screen" id="streamBox" tabindex="0">
             <img id="video" alt="">
             <video id="videoRtc" playsinline autoplay muted style="display:none;width:100%;height:100%;object-fit:contain"></video>
-            <div class="ph" id="videoPh">Click <b>Capture</b> to take keyboard &amp; mouse control of the target</div>
+            <div class="ph" id="videoPh"><b>Click the screen</b> to take keyboard &amp; mouse control · press <b>Esc</b> to release</div>
           </div>
           <div class="btns" style="margin-top:12px">
             <span class="chip" onclick="combo(['ControlLeft','AltLeft','Delete'])">Ctrl+Alt+Del</span>
@@ -568,18 +568,18 @@ function imgGeo(){const el=activeVideoEl(),r=el.getBoundingClientRect();
 const btnName=b=>({0:"left",2:"right",1:"middle",3:"up",4:"down"}[b]||"left");
 const clamp127=v=>Math.max(-127,Math.min(127,v|0));
 /* --- capture / controls --- */
-function kvmToggleCapture(){kvmCap=!kvmCap;const box=$("#streamBox"),btn=$("#capBtn");
-  btn.textContent=kvmCap?"Release":"Capture";btn.classList.toggle("ghost",kvmCap);box.classList.toggle("cap",kvmCap);
-  box.style.cursor=(kvmCap&&kvmAbs)?"crosshair":"default";
-  if(kvmCap){box.focus();setLed("ledKbd","g");setLed("ledMouse","g");
-    // Keyboard Lock captures Escape (and shortcuts) so a quick Esc reaches the
-    // target and only a ~2s hold releases control. Needs fullscreen; best-effort.
-    try{if(navigator.keyboard&&navigator.keyboard.lock){
-      (box.requestFullscreen?box.requestFullscreen():Promise.resolve()).then(()=>navigator.keyboard.lock(["Escape"])).catch(()=>{});}}catch(e){}
-    toast(kvmAbs?"Capturing — hold Esc ~2s to release control":"Relative mouse — click the video to lock; hold Esc ~2s to release");}
-  else{setLed("ledKbd","");setLed("ledMouse","");if(document.pointerLockElement)document.exitPointerLock();
-    try{if(navigator.keyboard&&navigator.keyboard.unlock)navigator.keyboard.unlock();}catch(e){}
-    if(document.fullscreenElement)document.exitFullscreen().catch(()=>{});}}
+/* Simple, reliable capture model: click the screen to take control, press Esc
+   to release. (To send Esc to the target, use the "Esc" quick-action chip.) */
+function captureOn(){const box=$("#streamBox"),btn=$("#capBtn");if(kvmCap)return;
+  kvmCap=true;btn.textContent="Release";btn.classList.add("ghost");box.classList.add("cap");
+  box.style.cursor=kvmAbs?"crosshair":"none";box.focus();setLed("ledKbd","g");setLed("ledMouse","g");
+  toast("Screen control active — press Esc to release");}
+function captureOff(){const box=$("#streamBox"),btn=$("#capBtn");
+  kvmCap=false;btn.textContent="Capture";btn.classList.remove("ghost");box.classList.remove("cap");
+  box.style.cursor="default";setLed("ledKbd","");setLed("ledMouse","");
+  if(document.pointerLockElement)document.exitPointerLock();
+  if(document.fullscreenElement)document.exitFullscreen().catch(()=>{});toast("Control released");}
+function kvmToggleCapture(){if(kvmCap)captureOff();else captureOn();}
 /* Switch the kvmd HID mouse gadget (usb=absolute, usb_rel=relative). kvmd
    defaults to absolute and ignores relative reports until the gadget is
    switched — this is why relative mode was dead before. */
@@ -678,27 +678,28 @@ function toggleOsk(){const box=$("#osk");buildOsk();const show=box.style.display
 /* --- wire input on the stream box --- */
 (function(){const box=$("#streamBox");if(!box)return;
   box.addEventListener("contextmenu",e=>e.preventDefault());
-  let escTimer=null,escExited=false;
   const locked=()=>document.pointerLockElement===box;
   const active=()=>kvmCap||locked();
   box.addEventListener("mousedown",e=>{
-    // Relative mode: the first click locks the pointer (a user gesture is required).
-    if(!kvmAbs&&!locked()){e.preventDefault();if(box.requestPointerLock)box.requestPointerLock();return;}
-    if(!active())return;e.preventDefault();box.focus();sendBtn(btnName(e.button),true);});
+    if(!kvmAbs){ // relative mouse: clicking the screen locks the pointer (that IS taking control)
+      if(!locked()){e.preventDefault();captureOn();if(box.requestPointerLock)box.requestPointerLock();return;}
+      e.preventDefault();sendBtn(btnName(e.button),true);return;}
+    // absolute mouse: click the screen to take control; the click also passes through
+    if(!kvmCap)captureOn();
+    e.preventDefault();box.focus();sendBtn(btnName(e.button),true);});
   box.addEventListener("mouseup",e=>{if(!active())return;e.preventDefault();sendBtn(btnName(e.button),false);});
   box.addEventListener("mousemove",e=>{
     if(kvmAbs){if(!kvmCap)return;const g=imgGeo();sendMove(remap(e.clientX-g.x,0,g.width-1,-32768,32767),remap(e.clientY-g.y,0,g.height-1,-32768,32767));}
     else if(locked()){sendRel(clamp127(e.movementX),clamp127(e.movementY));}});
   box.addEventListener("wheel",e=>{if(!active())return;e.preventDefault();sendWheel(0,e.deltaY>0?-5:5);},{passive:false});
   box.addEventListener("keydown",e=>{if(!active())return;e.preventDefault();
-    if(e.code==="Escape"){ // quick tap → forward to target; hold ~2s → release control
-      if(!escTimer){escExited=false;escTimer=setTimeout(()=>{escTimer=null;escExited=true;kvmToggleCapture();},1500);}return;}
+    if(e.code==="Escape"){captureOff();return;}  // Esc releases control (use the Esc chip to send Esc to the target)
     if(!e.repeat)sendKey(e.code,true);});
-  box.addEventListener("keyup",e=>{if(!active()&&e.code!=="Escape")return;e.preventDefault();
-    if(e.code==="Escape"){ if(escTimer){clearTimeout(escTimer);escTimer=null;if(!escExited){sendKey("Escape",true);sendKey("Escape",false);}} escExited=false;return;}
-    sendKey(e.code,false);});
-  // Keep the mouse LED honest as pointer-lock engages/releases (Esc to release).
-  document.addEventListener("pointerlockchange",()=>{const on=locked();setLed("ledMouse",on||kvmCap?"g":"");setLed("ledKbd",on||kvmCap?"g":"");});
+  box.addEventListener("keyup",e=>{if(!active())return;e.preventDefault();if(e.code==="Escape")return;sendKey(e.code,false);});
+  // If the pointer lock drops (e.g. Esc in relative mode), release control cleanly.
+  document.addEventListener("pointerlockchange",()=>{const on=locked();
+    if(!on&&!kvmAbs&&kvmCap)captureOff();
+    setLed("ledMouse",(on||kvmCap)?"g":"");setLed("ledKbd",(on||kvmCap)?"g":"");});
 })();
 
 /* power & media */
