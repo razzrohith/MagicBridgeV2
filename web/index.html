@@ -171,7 +171,7 @@ button.btn.danger:hover{background:rgba(229,83,75,.1)}
               <select id="mouseMode" onchange="kvmSetMouseMode()" style="width:auto">
                 <option value="usb">Absolute mouse</option><option value="usb_rel">Relative mouse</option></select>
               <select id="transport" onchange="setTransport()" style="width:auto" title="Video transport">
-                <option value="mjpeg">MJPEG</option><option value="webrtc">WebRTC · H.264</option></select>
+                <option value="webrtc" selected>WebRTC · H.264</option><option value="mjpeg">MJPEG</option></select>
               <button class="btn ghost" id="oskBtn" onclick="toggleOsk()">Keyboard</button>
               <button class="btn ghost" onclick="kvmFullscreen()">Fullscreen</button>
             </div>
@@ -844,7 +844,12 @@ function fmtUp(s){if(!s)return "—";s=+s;const d=Math.floor(s/86400),h=Math.flo
 function goPage(p){const b=[...document.querySelectorAll("#nav button")].find(x=>x.dataset.p===p);if(b)b.click();}
 async function pollUpdate(){const r=await jget(MB+"/net/update");const c=$("#updChip");if(!c)return;
   if(r&&r.ok&&r.updates>0){c.style.display="";c.textContent="⟳ "+r.updates+" update"+(r.updates>1?"s":"")+" available";}else{c.style.display="none";}}
-kvmReloadStream();kvmConnect();refreshTop();loadMsd();loadStreamCtl();loadGpio();renderClips();pollUpdate();
+/* Start video on the selected transport. WebRTC (H.264) is the default — it
+   shares the single hardware encoder with any other viewers, whereas the MJPEG
+   JPEG sink can't run while H.264 is active, so it's the reliable choice here. */
+function startVideo(){const t=$("#transport");
+  if(t&&t.value==="webrtc"&&window.RTCPeerConnection){startWebrtc();}else{transport="mjpeg";kvmReloadStream();}}
+startVideo();kvmConnect();refreshTop();loadMsd();loadStreamCtl();loadGpio();renderClips();pollUpdate();
 setInterval(refreshTop,5000);setInterval(pollUpdate,180000);
 </script>
 </body>
