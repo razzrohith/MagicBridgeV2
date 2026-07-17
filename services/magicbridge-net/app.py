@@ -559,14 +559,42 @@ async def vnc_get(_):
                               "enabled": "enabled" in enabled, "port": 5900})
 
 
+VNC_WANTS = "/etc/systemd/system/multi-user.target.wants/kvmd-vnc.service"
+VNC_UNIT = "/usr/lib/systemd/system/kvmd-vnc.service"
+
+
 async def vnc_set(request):
     body = await request.json()
     on = bool(body.get("on"))
-    if on:
-        rc, out = sh("systemctl", "enable", "--now", "kvmd-vnc", timeout=25)
-    else:
-        rc, out = sh("systemctl", "disable", "--now", "kvmd-vnc", timeout=25)
-    return web.json_response({"ok": rc == 0, "on": on, "detail": out[-800:]})
+    # NOTE: `systemctl enable` fails with EROFS here even after remounting / rw —
+    # its symlink write goes through a path that doesn't observe our remount. But a
+    # plain os.symlink() under /etc DOES work after _rw() (same as writing the TOTP
+    # secret), so we create the boot-persistence symlink ourselves and use plain
+    # start/stop (which never touch disk) for the immediate action.
+    _rw()
+    try:
+        if on:
+            try:
+                os.makedirs(os.path.dirname(VNC_WANTS), exist_ok=True)
+                if not os.path.islink(VNC_WANTS):
+                    os.symlink(VNC_UNIT, VNC_WANTS)
+            except FileExistsError:
+                pass
+            except Exception as e:
+                log.warning("vnc enable symlink: %s", e)
+            rc, out = sh("systemctl", "start", "kvmd-vnc", timeout=25)
+        else:
+            rc, out = sh("systemctl", "stop", "kvmd-vnc", timeout=25)
+            try:
+                if os.path.islink(VNC_WANTS):
+                    os.remove(VNC_WANTS)
+            except Exception as e:
+                log.warning("vnc disable symlink: %s", e)
+    finally:
+        _ro()
+    active = sh("systemctl", "is-active", "kvmd-vnc")[0] == 0
+    return web.json_response({"ok": (active == on), "on": on, "active": active,
+                              "boot_persist": os.path.islink(VNC_WANTS), "detail": out[-800:]})
 
 
 # ---- 2FA / TOTP (standard RFC-6238, no external deps) --------------
