@@ -440,8 +440,8 @@ $$("#nav button").forEach(b=>b.onclick=()=>{
   ({screen:loadStreamCtl,power:loadGpio,network:loadNetwork,auto:()=>{loadAuto();renderClips();},system:()=>{loadSystem();loadIdentityView();}}[p]||(()=>{}))();
 });
 
-/* ===== KVM core — live video + keyboard/mouse over kvmd's binary WebSocket =====
-   Protocol reused from PiKVM/kvmd (GPLv3): session.js / keyboard.js / mouse.js.
+/* ===== KVM core — live video + keyboard/mouse over the binary control WebSocket =====
+   Protocol reused from the upstream engine (GPLv3): session.js / keyboard.js / mouse.js.
    Key:   [0x01, state, ...ascii(code)]        (code = KeyboardEvent.code, e.g. "KeyA")
    MBtn:  [0x02, state, ...ascii(button)]       (button = left/right/middle/up/down)
    Move:  [0x03, xHi,xLo, yHi,yLo]              (x,y remapped to -32768..32767, big-endian)
@@ -454,8 +454,8 @@ function kvmStreamSrc(){let p="/streamer/stream?key="+Math.random().toString(36)
   if(/chrome|chromium|edg|crios/i.test(navigator.userAgent))p+="&advance_headers=1";
   else if(/safari|iphone|ipad/i.test(navigator.userAgent))p+="&dual_final_frames=1";return p;}
 function kvmReloadStream(){const v=$("#video");v.onload=()=>{$("#videoPh").style.display="none";};v.onerror=()=>{$("#videoPh").style.display="";};v.src=kvmStreamSrc();}
-/* ===== WebRTC (H.264) transport — reuses PiKVM's janus.plugin.ustreamer (GPLv3),
-   ported from kvmd stream_janus.js. Opt-in; auto-falls back to MJPEG on failure. ===== */
+/* ===== WebRTC (H.264) transport — reuses the engine's janus.plugin.ustreamer (GPLv3),
+   ported from the upstream stream_janus.js. Opt-in; auto-falls back to MJPEG on failure. ===== */
 function janusWsUrl(){return (location.protocol==='https:'?'wss':'ws')+'://'+location.host+'/janus/ws';}
 function JanusStreamer(videoEl,onActive,onInfo){
   let stop=false,janus=null,handle=null,retry=null,infoTimer=null,frames=0;
@@ -799,7 +799,7 @@ async function loadIdentityView(){
     if($("#id_usb"))$("#id_usb").textContent=(c.label||"—")+"  ("+toHexId(c.vendor_id)+":"+toHexId(c.product_id)+")";
     if($("#id_serial"))$("#id_serial").textContent=c.serial||"—";
     if($("#id_safe"))$("#id_safe").innerHTML=c.safe_mode?'<span class="tag ok">on</span>':'<span class="tag">off</span>';}
-  const n=await jget(MB+"/net/status");if(n&&n.mac&&n.mac.mac&&$("#id_mac"))$("#id_mac").textContent=n.mac.mac;
+  const n=await jget(MB+"/net/status");if($("#id_mac"))$("#id_mac").textContent=(n&&n.mac&&n.mac.mac)?n.mac.mac:"—";
   const mon=await jget(MB+"/net/monitor");if(mon&&mon.current&&$("#id_mon")){
     const nm=(mon.current.match(/Monitor name:\s*(.+)/i)||[])[1]||(mon.current.match(/Manufacturer ID:\s*(\w+)/i)||[])[1];
     $("#id_mon").textContent=nm?nm.trim():"—";}

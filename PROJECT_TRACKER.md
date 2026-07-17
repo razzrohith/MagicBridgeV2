@@ -22,7 +22,8 @@
 | Branding (MagicBridgeV2, PiKVM tells stripped from visible UI) | ✅ Mostly — see B5 |
 | Professional glass UI theme (cockpit + Stealth page) + custom login page | ✅ Deployed `7ae5597` — awaiting Raj's visual confirmation (Chrome extension was offline this session) |
 | Stealth page hidden from main nav / no mention in main UI | ✅ Done `7ae5597` |
-| USB identity presets + MAC spoof + monitor(EDID) spoof (Stealth page) | ⚠️ Present but not fully verified/applied (Phase 4) |
+| USB identity presets + MAC spoof + monitor(EDID) spoof (Stealth page) | ✅ Verified `[pending commit]` — realistic serials, no CAFEBABE, config persists |
+| Settings persistence across reboot (identity, MAC, DuckDNS, lockdown) | ✅ Fixed `[pending commit]` — save_config now unlocks the read-only rootfs |
 | Power (ATX) / Virtual Media / Wake-on-LAN pages | ✅ Cleaned up `112fa2a` — MSD + WoL removed, ATX kept w/ honest "not wired" note (see D1 revision below) |
 | Tailscale install / bring-up / Funnel | ✅ Fixed `112fa2a` — see B1 resolution below |
 | Saved-WiFi management (list/add/forget) in UI | ✅ Done `112fa2a` — Network page now lists saved SSIDs with Forget |
@@ -36,8 +37,8 @@
 - **B1 — Tailscale won't install or come up. ✅ FIXED `112fa2a`.** Root causes found by testing directly on the Pi: (1) `tailscale_install()` never unlocked the read-only rootfs before running `pacman`/`systemctl enable`, so both silently failed — fixed by wrapping in `_rw()`/`_ro()`. (2) `tailscale up` on a never-authenticated node prints a login URL then blocks; the old code's 30s timeout discarded all output including that URL — `sh()` now recovers partial output from `subprocess.TimeoutExpired`, and `tailscale_ctl()` extracts the URL and returns it as `login_url`, which both the cockpit's Network page and the Stealth page now render as a clickable "sign in" link instead of a lost toast. (3) `tailscale up`/`down` also need brief rootfs write access for tailscaled's state file — same `_rw()`/`_ro()` wrap. (4) nginx's default 60s `proxy_read_timeout` could cut off a slow install — bumped to 180s for `/mb/net/`. Verified end to end on the live Pi: install → enable → `tailscale up` → real `https://login.tailscale.com/...` URL returned, filesystem correctly relocked read-only after. **Remaining: Raj needs to open the login link himself to complete the OAuth handshake — that step can't be done on his behalf.**
 - **B2 — VNC (Remote access) not working.** "Optional VNC client access" does nothing. kvmd-vnc service enable/config + Stealth toggle wiring to verify.
 - **B3 — Two-factor login (2FA) not working.** TOTP enable/verify path broken; login page has a "2FA code" field but backend flow is incomplete.
-- **B4 — System page has empty/`—` fields.** Health → Uptime shows `—`; Identity & anonymity → MAC address `—`, USB serial `—`. Values exist elsewhere but aren't surfaced here.
-- **B5 — Identity spoof not fully applied / real model leaks.** Monitor still reads as "PiKVM V4 Mini" somewhere; video + keyboard/mouse not fully presented as realistic devices at the hardware/descriptor level (not just labels in the UI). USB serial blank.
+- **B4 — System page empty/`—` fields. ✅ FIXED `[pending commit]`.** MAC now comes from the live interface hardware address (`/net/status` reports it whether or not it's been spoofed), USB serial comes from the live gadget (`/stealth/identity` reads configfs). Root cause of the blanks was partly B4-adjacent: **`save_config()` was silently failing** because the state dir `/var/lib/magicbridge` is on the read-only rootfs and the write never unlocked it — so no setting persisted at all. Fixed in `mbcommon.save_config()` with an rw/ro toggle. (Uptime was already fixed earlier via `/net/sys`.)
+- **B5 — Identity spoof not fully applied / real tells. ✅ FIXED `[pending commit]`.** The USB gadget serial and the monitor's ASCII serial were BOTH literally `CAFEBABE` — kvmd's hardcoded default magic-number, an instant "fake device" giveaway. Fixed: `monitor_set()` now passes `--set-monitor-serial` with a realistic per-vendor serial (verified: Dell now reads `CN33295ZA`); the OTG override always emits a realistic serial instead of leaving it empty→CAFEBABE (verified gadget serial `CC0AA376`), and the boot override pins one too so a fresh boot is clean. Two `PiKVM` literals removed from index.html comments. Verified on the live Pi: vendor/product still `046d:c52b` Logitech, gadget stayed bound to the UDC (keyboard/mouse alive) through the rebuild.
 - **B6 — Login page looks like stock PiKVM.** The `/login/` page visually matches the original PiKVM login → breaks the "no PiKVM tells" rule.
 - **B7 — Stealth link visible in main nav.** The main cockpit shows a "Stealth" item in the left sidebar; it should be hidden (anonymity), reachable only by those who know the direct URL.
 
@@ -64,7 +65,7 @@ Goal: full WiFi control from the UI (parity with old MagicBridge v1/v2) + workin
 1. **Saved-network manager:** list saved SSIDs, add new, edit password, forget/remove, set priority. Backed by `wpa_supplicant-wlan0.conf` (reuse the safe write path proven in the portal fix).
 2. **Fix Tailscale (B1):** install, up/down, Funnel on/off, Lockdown on/off, show login/auth URL and status.
 
-### Phase 4 — Identity spoofing completeness (video + USB)
+### Phase 4 — Identity spoofing completeness (video + USB) ✅ DONE `[pending commit]`
 Goal: the bridge presents only realistic hardware; zero PiKVM/RPi/V4-Mini tells anywhere.
 1. **Monitor/EDID:** apply a realistic monitor EDID for real (verify target reads it), remove the "PiKVM V4 Mini" leak (B5). Surface full, detailed monitor info.
 2. **USB keyboard/mouse:** ensure the OTG gadget actually presents the chosen realistic vendor/product/serial (not just UI labels); populate USB serial.

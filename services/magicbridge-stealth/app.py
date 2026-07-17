@@ -86,14 +86,24 @@ def _fs(mode: str):
         (mode, "rw" if mode == "rw" else "ro"))
 
 def write_otg_override(ident: dict) -> None:
-    """Write our OTG override snippet (rw window kept as small as possible)."""
+    """Write our OTG override snippet (rw window kept as small as possible).
+
+    Always emits a REALISTIC serial. kvmd's built-in default is the string
+    "CAFEBABE" (a well-known magic number) whenever the serial is absent/empty —
+    an obvious "this is a fake gadget" tell — so we never leave it unset. Mutates
+    ident['serial'] in place so the caller persists the value it actually applied.
+    """
+    serial = str(ident.get("serial") or "").strip()
+    if not serial or serial.upper() == "CAFEBABE":
+        serial = rand_serial()
+    ident["serial"] = serial
     body = (
         "otg:\n"
         f"    vendor_id: 0x{ident['vendor_id']:04X}\n"
         f"    product_id: 0x{ident['product_id']:04X}\n"
         f"    manufacturer: \"{ident['manufacturer']}\"\n"
         f"    product: \"{ident['product']}\"\n"
-        f"    serial: \"{ident['serial']}\"\n"
+        f"    serial: \"{serial}\"\n"
     )
     _fs("rw")
     try:
@@ -178,9 +188,21 @@ async def set_password(request: web.Request):
 # ---- handlers -------------------------------------------------------
 async def health(_): return web.json_response({"ok": True, "service": "magicbridge-stealth"})
 
+def _live_gadget_serial():
+    """The serial the target actually sees right now (configfs) — source of truth."""
+    try:
+        return open("/sys/kernel/config/usb_gadget/kvmd/strings/0x409/serialnumber").read().strip()
+    except Exception:
+        return ""
+
+
 async def get_identity(_):
+    cur = current_identity()
+    live = _live_gadget_serial()
+    if live:  # reflect what's actually applied, not just the last saved config
+        cur = {**cur, "serial": live}
     return web.json_response({
-        "current": current_identity(),
+        "current": cur,
         "presets": {k: {"label": v["label"], "verified": v["verified"]} for k, v in PRESETS.items()},
     })
 

@@ -17,6 +17,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import subprocess
 from pathlib import Path
 
 INSTALL_ROOT = Path(os.environ.get("MB_ROOT", "/opt/magicbridge"))
@@ -65,10 +66,23 @@ def load_config(name: str, default: dict | None = None) -> dict:
     return dict(default or {})
 
 
+def _fs(mode: str):
+    """Toggle PiKVM's read-only rootfs. STATE_DIR lives on the root fs (it is NOT a
+    tmpfs mount), so a plain write silently fails with EROFS unless we unlock first —
+    which is exactly why no MagicBridge setting used to survive a reboot."""
+    cmd = "command -v rw >/dev/null && rw || mount -o remount,rw /" if mode == "rw" \
+          else "command -v ro >/dev/null && ro || mount -o remount,ro /"
+    try:
+        subprocess.run(["bash", "-c", cmd], capture_output=True, timeout=15)
+    except Exception:
+        pass
+
+
 def save_config(name: str, data: dict) -> bool:
     """Persist to the WRITABLE state dir only (never /etc). Files are 0600.
     Returns True on success; logs and returns False on failure instead of raising,
     so a handler never 500s just because a write failed."""
+    _fs("rw")
     try:
         STATE_DIR.mkdir(parents=True, exist_ok=True)
         try:
@@ -87,6 +101,8 @@ def save_config(name: str, data: dict) -> bool:
     except Exception as e:
         _log.error("save_config(%s) failed: %s", name, e)
         return False
+    finally:
+        _fs("ro")
 
 
 # --- kvmd API base (creds/URL live in kvmd.json; defaults match PiKVM) ---

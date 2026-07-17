@@ -78,12 +78,28 @@ async def sysinfo(_):
                               "hostname": os.uname().nodename})
 
 
+def _iface_mac(iface):
+    """Actual current hardware address of an interface (what the network sees now)."""
+    try:
+        return open("/sys/class/net/%s/address" % iface).read().strip()
+    except Exception:
+        return None
+
+
 async def status(_):
     ts_rc, ts_out = sh("tailscale", "status", "--json", timeout=8)
+    cfg = load_config("net", {})
+    # Report the LIVE MAC of the active interface (spoofed or not) so the System
+    # page never shows a blank — the old code only surfaced a MAC if one had been
+    # explicitly spoofed this session.
+    macs = {i: _iface_mac(i) for i in ("wlan0", "eth0") if _iface_mac(i)}
+    active_mac = macs.get("wlan0") or macs.get("eth0")
     return web.json_response({
         "tailscale": {"up": ts_rc == 0, "raw": ts_out[:2000]},
-        "duckdns": load_config("net", {}).get("duckdns", {"enabled": False}),
+        "duckdns": cfg.get("duckdns", {"enabled": False}),
         "hostname": os.uname().nodename,
+        "mac": {"mac": active_mac, "spoofed": bool(cfg.get("mac"))},
+        "macs": macs,
     })
 
 
@@ -407,6 +423,20 @@ async def monitor_get(_):
         "current": cur[-1500:]})
 
 
+def _realistic_monitor_serial(mfc):
+    """A plausible ASCII display serial (max 13 chars) — never the CAFEBABE tell.
+    Loosely mimics real vendor serial formats so the target reads a believable panel."""
+    import random, string
+    d = "".join(random.choices(string.digits, k=7))
+    a = "".join(random.choices(string.ascii_uppercase, k=2))
+    fmt = {
+        "DEL": "CN%s%s" % ("".join(random.choices(string.digits, k=5)), a),   # Dell-ish
+        "GSM": "%s%sLG" % (a, "".join(random.choices(string.digits, k=6))),   # LG
+        "SAM": "H%sNZ" % "".join(random.choices(string.digits + string.ascii_uppercase, k=7)),  # Samsung
+    }
+    return (fmt.get(mfc) or (a + d))[:13]
+
+
 async def monitor_set(request):
     import random
     body = await request.json()
@@ -418,13 +448,17 @@ async def monitor_set(request):
         name = body.get("name") or "Generic Display"
         product = int(str(body.get("product") or "4097"), 0)
     serial = random.randint(1000000, 99999999)
+    mon_serial = _realistic_monitor_serial(mfc)   # ASCII DTD serial — replaces "CAFEBABE"
     _rw()
     try:
         rc, out = sh("kvmd-edidconf", "--set-mfc-id", mfc, "--set-monitor-name", name,
-                     "--set-product-id", str(product), "--set-serial", str(serial), "--apply", timeout=45)
+                     "--set-product-id", str(product), "--set-serial", str(serial),
+                     "--set-monitor-serial", mon_serial, "--apply", timeout=45)
     finally:
         _ro()
-    return web.json_response({"ok": rc == 0, "applied": {"mfc": mfc, "name": name, "product": product, "serial": serial},
+    return web.json_response({"ok": rc == 0,
+                              "applied": {"mfc": mfc, "name": name, "product": product,
+                                          "serial": serial, "monitor_serial": mon_serial},
                               "detail": out[-1200:]})
 
 
