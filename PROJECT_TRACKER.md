@@ -20,8 +20,10 @@
 | Relative + absolute mouse, human-typing paste, OSK, clips, combos | ✅ Working |
 | Click-to-capture / Esc-to-release | ✅ Working |
 | Branding (MagicBridgeV2, PiKVM tells stripped from visible UI) | ✅ Mostly — see B5 |
+| Professional glass UI theme (cockpit + Stealth page) + custom login page | ✅ Deployed `7ae5597` — awaiting Raj's visual confirmation (Chrome extension was offline this session) |
+| Stealth page hidden from main nav / no mention in main UI | ✅ Done `7ae5597` |
 | USB identity presets + MAC spoof + monitor(EDID) spoof (Stealth page) | ⚠️ Present but not fully verified/applied (Phase 4) |
-| Power (ATX) / Virtual Media / Wake-on-LAN pages | ⚠️ Present, questioned for removal (Phase 2) |
+| Power (ATX) / Virtual Media / Wake-on-LAN pages | ✅ Cleaned up `[pending commit]` — MSD + WoL removed, ATX kept w/ honest "not wired" note (see D1 revision below) |
 | Tailscale install / bring-up / Funnel | ❌ Not working (B1) |
 | VNC remote access | ❌ Not working (B2) |
 | Two-factor (TOTP) login | ❌ Not working (B3) |
@@ -86,7 +88,7 @@ Goal: richer, live, read-only telemetry on the main System page.
 
 ## 4. Decisions (locked 2026-07-17, defaults chosen so work isn't blocked — reversible)
 
-- **D1 — Power (ATX):** hidden/disabled until an ATX cable is actually detected/wired (not deleted — cheap to re-enable later).
+- **D1 — Power (ATX), revised during Phase 2:** true auto-detection turned out to be impossible — kvmd has no way to sense whether the ATX header pins are physically wired to a target motherboard (it only reads GPIO pin state, which floats/reads-off either way). Kept the card visible with an explicit note that it needs the header wired to do anything, instead of faking a "detected" state.
 - **D2 — Wake-on-LAN:** removed. Can't wake anything meaningful over a WiFi-only link with no wired NIC on the target.
 - **D3 — Stealth access:** no nav link in main UI; reachable only via direct `/stealth/` URL, gated by the existing stealth password.
 - **D4 — "Power & Media" page fate:** MSD removed, WoL removed, ATX hidden pending cable detection → page folds into System (or the nav item drops entirely if nothing survives after Phase 2 work lands).
@@ -95,6 +97,7 @@ Goal: richer, live, read-only telemetry on the main System page.
 
 ## 5. Changelog (recent fixes)
 
+- **2026-07-17 · `7ae5597`** — Phase 1 UI redesign shipped: shared graphite/glass theme (backdrop-filter blur + translucency) applied to the main cockpit and the Stealth page; Stealth page's neon cyan/violet palette + monospace HUD font replaced with the cockpit's palette/font; Stealth nav link removed from the main sidebar and all "Stealth"/"anonymity" wording stripped from the System page's Identity card (renamed "Device identity", link removed); login page rebuilt from scratch (own CSS, no longer reuses kvmd's `login.css` layout) — kept kvmd's `main.js`/window-manager stylesheets so error dialogs still render, only the login-box layout is custom. Deployed via SFTP; server responded 200/302/401 as expected on `/login/`, `/mb/ui/`, `/stealth/`. **Not yet visually confirmed in a browser** — Claude-in-Chrome extension was disconnected during this session, so this was verified structurally (HTML balance, HTTP status codes) but not by eye. **Action for Raj:** hard-refresh (Ctrl+Shift+R) `magicbridge.local/login/`, `/mb/ui/`, and `/stealth/` and flag anything off.
 - **2026-07-17 · `e909cbf`** — Captive portal, final fix: renamed `rw()/ro()` helpers to `mb_rw/mb_ro` (a function named `rw` calling `rw` recursed forever and crashed the credential save mid-write); portal.py now ends only on a real submit so captive-portal probes no longer close the hotspot early. Verified: Pi saved creds and connected to WiFi.
 - **2026-07-17 · `cbda878`** — Captive portal: save WiFi creds as a plain quoted passphrase (not `wpa_passphrase`, which failed on SSIDs with spaces) and reboot to apply (in-place AP→station switch is flaky on brcmfmac); hotspot returns on next boot if creds are wrong.
 - **2026-07-17 · `552f289`** — Captive portal: run the provisioning script via `bash` in the unit (git-reset drops the +x bit → 203/EXEC), move logs + dnsmasq leases to `/run` (read-only rootfs), dnsmasq `bind-dynamic` to coexist with systemd-resolved, keep the hotspot up in a loop.
