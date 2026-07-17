@@ -27,8 +27,11 @@ WPA_CONF="/etc/wpa_supplicant/wpa_supplicant-${AP_IFACE}.conf"
 exec >> "$LOG" 2>&1
 echo "[$(date)] mb-portal starting"
 
-rw(){ command -v rw >/dev/null && rw || mount -o remount,rw / ; }
-ro(){ command -v ro >/dev/null && ro || mount -o remount,ro / ; }
+# NOTE: name these mb_rw/mb_ro, NOT rw/ro — a function named rw calling `rw`
+# recurses into itself forever (bash resolves the name to the function, not the
+# /usr/bin/rw helper) and crashes the script mid-save.
+mb_rw(){ command rw 2>/dev/null || mount -o remount,rw / ; }
+mb_ro(){ command ro 2>/dev/null || mount -o remount,ro / ; }
 online(){ ip route 2>/dev/null | grep -q '^default' || return 1
           ping -c1 -W2 1.1.1.1 >/dev/null 2>&1 || ping -c1 -W2 8.8.8.8 >/dev/null 2>&1; }
 
@@ -80,7 +83,7 @@ save_wifi(){
     local SSID PASS
     SSID=$(sed -n '1p' "$WIFI_FILE"); PASS=$(sed -n '2p' "$WIFI_FILE")
     echo "[$(date)] saving WiFi '$SSID' (password ${#PASS} chars)"
-    rw
+    mb_rw
     # ensure the conf has a usable header (harmless if it already does)
     if ! grep -q '^ctrl_interface=' "$WPA_CONF" 2>/dev/null; then
         printf 'ctrl_interface=/run/wpa_supplicant\nupdate_config=1\ncountry=US\n' > /tmp/mbwpa.$$
@@ -94,7 +97,7 @@ save_wifi(){
     else
         printf '\nnetwork={\n\tssid="%s"\n\tkey_mgmt=NONE\n}\n' "$SSID" >> "$WPA_CONF"
     fi
-    ro
+    mb_ro
     echo "[$(date)] wpa conf now lists $(grep -c 'ssid=' "$WPA_CONF" 2>/dev/null) network(s)"
     # optional Tailscale auth key
     if [ -f "$TS_KEY" ]; then cp "$TS_KEY" /run/mb-tskey 2>/dev/null; fi

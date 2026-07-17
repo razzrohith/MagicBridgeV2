@@ -123,8 +123,14 @@ class H(BaseHTTPRequestHandler):
             if tskey:
                 with open(TS_FILE, "w") as f:
                     f.write(tskey.replace("\n", "").replace("\r", "") + "\n")
-        self._send(PAGE.format(body=DONE.format(ssid=html.escape(ssid or "the network"))))
-        _done["v"] = True
+            self._send(PAGE.format(body=DONE.format(ssid=html.escape(ssid))))
+            # only end the portal on a real submission — captive-portal probes and
+            # empty POSTs must NOT close the hotspot
+            _done["v"] = True
+        else:
+            self._send(PAGE.format(body=FORM.format(opts="".join(
+                "<option value=\"%s\">%s</option>" % (html.escape(s), html.escape(s))
+                for s in scan_ssids()))))
 
 
 def main():
