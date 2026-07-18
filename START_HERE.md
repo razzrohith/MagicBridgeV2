@@ -1,12 +1,18 @@
-# 🧠 MagicBridge — START HERE
+# 🧠 MagicBridge PiKVM — START HERE
 
-This is the **entry point and full brain** for the MagicBridge project. If you're an AI
+> **This project's name is "MagicBridge PiKVM"** — the build on the **PiKVM V4 Mini** (kvmd-based).
+> Its sibling project is **"MagicBridge DIY"** — the hand-built Raspberry Pi 4 + C790 + LED +
+> bamboo-case rig (GitHub repo `MagicBridge`, worked on in the VMware VM via Claude Code CLI).
+> ⚠️ **Naming note:** for now this repo is still literally named `MagicBridgeV2` on GitHub —
+> that is the SAME thing as "MagicBridge PiKVM". The old "V1 / V2 / V3" labels are **retired**;
+> use the platform names ("MagicBridge PiKVM" here, "MagicBridge DIY" for the other one).
+
+This is the **entry point and full brain** for **MagicBridge PiKVM**. If you're an AI
 assistant picking this up in a fresh chat, or a human returning after a break, read this
 file first, then open the numbered files in `brain/`.
 
-Everything about this project — its whole history from TinyPilot inspiration through
-MagicBridge V1 (DIY Pi 4) to today's MagicBridge V2 on PiKVM V4 Mini hardware (what we now
-informally call **"MagicBridge V3 / the PiKVM build"**) — lives in these docs.
+The full history — from TinyPilot inspiration, through the earlier **MagicBridge DIY** hardware
+build, to this **MagicBridge PiKVM** (PiKVM V4 Mini) build — lives in these docs.
 
 ---
 

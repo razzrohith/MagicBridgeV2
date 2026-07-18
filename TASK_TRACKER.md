@@ -1,4 +1,7 @@
-# ✅ MagicBridge — Task Tracker (LIVING DOCUMENT)
+# ✅ MagicBridge PiKVM — Task Tracker (LIVING DOCUMENT)
+
+> Project: **MagicBridge PiKVM** (PiKVM V4 Mini build; GitHub repo `MagicBridgeV2` for now).
+> Sibling: **MagicBridge DIY** (Pi 4 + C790 + bamboo case; repo `MagicBridge`, VM CLI). V1/V2/V3 labels retired.
 
 > **This is the single source of truth for what's done, pending, and broken.**
 > Update it on EVERY change: move items between sections, add new bugs/tasks as found, and

@@ -1,8 +1,10 @@
-# MagicBridgeV2
+# MagicBridge PiKVM
+
+> **Project name: "MagicBridge PiKVM".** Sibling project = **"MagicBridge DIY"** (hand-built Pi 4 + C790 + bamboo case, repo `MagicBridge`). This repo is still named `MagicBridgeV2` on GitHub for now — same project. Old V1/V2/V3 labels retired.
 
 **A professional, self-hosted KVM-over-IP platform for the PiKVM V4 Mini — built on the proven PiKVM/kvmd core, wrapped in the MagicBridge experience.**
 
-MagicBridgeV2 is the second-generation MagicBridge. Instead of hand-building the low-level capture, HID and power pipeline from scratch (V1), V2 stands on the battle-tested **kvmd** engine that ships with the official PiKVM V4 Mini, and layers the features that make MagicBridge *MagicBridge* on top:
+MagicBridge PiKVM stands on the battle-tested **kvmd** engine that ships with the official PiKVM V4 Mini (instead of hand-building the capture/HID/power pipeline from scratch the way **MagicBridge DIY** does), and layers the features that make MagicBridge *MagicBridge* on top:
 
 - **Stealth USB identity** — spoof VID/PID/serial/manufacturer, live profile switching, safe-mode.
 - **AI Agent + Macros** — natural-language → keystrokes, macro runner (keys stored server-side).
