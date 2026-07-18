@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>MagicBridgeV2</title>
+<title>MagicBridge</title>
 <style>
 :root{
   --bg:#0b0e13; --surface:#12161d; --surface2:#171c24; --surface3:#1d232c;
@@ -129,7 +129,7 @@ button.btn.danger:hover{background:rgba(229,83,75,.1)}
   <aside class="side">
     <div class="brand">
       <div class="logo">M</div>
-      <div class="brand-t"><b>MagicBridgeV2</b><span>KVM over IP</span></div>
+      <div class="brand-t"><b>MagicBridge</b><span>KVM over IP</span></div>
     </div>
     <nav class="nav" id="nav">
       <div class="lbl">Control</div>
@@ -141,7 +141,7 @@ button.btn.danger:hover{background:rgba(229,83,75,.1)}
       <button data-p="system"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M19 5l-2 2M7 17l-2 2"/></svg>System</button>
     </nav>
     <div class="foot"><span class="dot"></span><span id="fstatus">online</span> · <span id="fver">v2</span><br>
-      <span style="color:var(--text3)">MagicBridgeV2 · secure link</span></div>
+      <span style="color:var(--text3)">MagicBridge · secure link</span></div>
   </aside>
 
   <main class="main">
@@ -426,7 +426,7 @@ button.btn.danger:hover{background:rgba(229,83,75,.1)}
             <button class="btn ghost" onclick="window.open('/index.html','_blank')">Terminal launcher ↗</button>
             <button class="btn ghost" onclick="window.open('/kvm/','_blank')">Native KVM view ↗</button>
           </div>
-          <div class="hint">These are the (rebranded) kvmd engine pages. MagicBridgeV2 is your default console — use these only for the web shell or a video fallback.</div>
+          <div class="hint">These are the (rebranded) kvmd engine pages. MagicBridge is your default console — use these only for the web shell or a video fallback.</div>
         </div>
         <div class="card">
           <h3>Logs</h3>
@@ -794,8 +794,8 @@ function flat(o,p){let out={};for(const k in o){const v=o[k],key=p?p+"."+k:k;if(
 async function loadSystem(){const r=await jget(KVMD+"/info");const d=res(r);
   const meta=(d.meta&&d.meta.server)||{};const hw=d.hw||{};
   $("#sys_info").innerHTML=`<div class="kv"><span class="k">Hostname</span><span class="v">${(d.meta&&d.meta.server&&d.meta.server.host)||location.hostname}</span></div>
-    <div class="kv"><span class="k">Device</span><span class="v">MagicBridgeV2 Appliance</span></div>
-    <div class="kv"><span class="k">Product</span><span class="v">MagicBridgeV2</span></div>
+    <div class="kv"><span class="k">Device</span><span class="v">MagicBridge Appliance</span></div>
+    <div class="kv"><span class="k">Product</span><span class="v">MagicBridge</span></div>
     <div class="kv"><span class="k">Firmware</span><span class="v">MagicBridge OS · v2</span></div>`;
   const t=hw.health&&hw.health.temp?hw.health.temp.cpu:null;
   $("#h_temp").textContent=t?(+t).toFixed(1)+" °C":"—";
@@ -825,7 +825,7 @@ async function loadTsPeers(){const r=await jget(MB+"/net/tailscale/peers");const
   el.innerHTML=r.peers.map(p=>{const dot=p.online?'<span class="led g"></span>':'<span class="led"></span>';
     const loc=p.location?(" · "+p.location):"";const os=p.os?(" · "+p.os):"";
     return `<div class="kv"><span class="k">${dot}${p.hostname||p.dns||"peer"}${os}${loc}</span><span class="v">${p.ip||""}</span></div>`;}).join("");}
-async function applyUpdate(){if(!confirm("Pull the latest MagicBridgeV2 and restart services?"))return;
+async function applyUpdate(){if(!confirm("Pull the latest MagicBridge and restart services?"))return;
   $("#upd_state").textContent="updating…";const r=await jpost(MB+"/net/update/apply");
   toast(r&&r.ok?"Updated — services restarted":"Update failed",r&&r.ok?"ok":"bad");$("#upd_state").textContent=r&&r.ok?"up to date":"update failed";setTimeout(pollUpdate,1500);}
 async function hidConnect(on){const r=await jpost(KVMD+"/hid/set_connected?connected="+(on?1:0));toast(r&&r.ok!==false?("USB HID "+(on?"reconnected":"disconnected")):"HID change failed",r&&r.ok!==false?"ok":"bad");}
