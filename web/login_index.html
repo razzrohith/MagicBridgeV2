@@ -8,7 +8,7 @@
     <link rel="icon" type="image/png" sizes="32x32" href="../share/favicon-32x32.png">
     <link rel="icon" type="image/png" sizes="16x16" href="../share/favicon-16x16.png">
     <link rel="manifest" href="../share/site.webmanifest">
-    <meta name="theme-color" content="#0b0e13">
+    <meta name="theme-color" content="#040911">
     <!-- keep the engine stylesheets that power error dialogs / the window manager;
          only login.css (the stock PiKVM login layout) is dropped and replaced below -->
     <link rel="stylesheet" href="../share/css/vars.css">
@@ -18,53 +18,64 @@
     <link rel="stylesheet" href="../share/css/radio.css">
     <link rel="stylesheet" href="../share/css/user.css">
     <style>
+      /* MagicBridge house style — matches the cockpit (DIY-derived cyan HUD). */
       :root{
-        --bg:#0b0e13; --surface:#12161d; --surface2:#171c24; --surface3:#1d232c;
-        --border:#262d38; --border2:#313a47;
-        --text:#e6edf3; --text2:#9aa4b2; --text3:#6b7482;
-        --accent:#5b8cff; --accent2:#3a6fe0; --accent-soft:rgba(91,140,255,.12);
-        --danger:#e5534b;
+        --bg:#040911; --surf:#070d18; --card:#0d1728; --card2:#111f34;
+        --border:rgba(140,220,255,.16); --border2:rgba(140,220,255,.34);
+        --accent:#22d3ee; --accent2:#0ea5c4; --accent-l:#8beefc;
+        --brand:linear-gradient(135deg,#8beefc 0%,#22d3ee 55%,#0b7a94 100%);
+        --text:#f1fbff; --sub:#a9cfe0; --muted:#88a8bd; --danger:#f43f5e;
       }
       *{box-sizing:border-box}
       html,body{margin:0;height:100%}
       body{
         background:var(--bg);color:var(--text);
-        font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,Helvetica,Arial,sans-serif;
+        font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;
         font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased;
-        display:grid;place-items:center;min-height:100vh;padding:20px;
-        background-image:radial-gradient(900px 480px at 15% -10%,rgba(91,140,255,.10),transparent 60%),
-          radial-gradient(700px 420px at 100% 0,rgba(91,140,255,.06),transparent 55%);
+        display:grid;place-items:center;min-height:100vh;padding:20px;position:relative;overflow:hidden;
       }
-      .panel{
+      /* gradient-mesh backdrop + faint HUD grid — same language as the cockpit */
+      body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
+        background:
+          radial-gradient(ellipse 900px 620px at 12% -8%,rgba(34,211,238,.10),transparent 60%),
+          radial-gradient(ellipse 760px 560px at 108% 18%,rgba(14,165,196,.11),transparent 60%),
+          radial-gradient(ellipse 820px 640px at 46% 118%,rgba(11,122,148,.09),transparent 62%),
+          linear-gradient(180deg,#040911 0%,#060c17 55%,#040911 100%);}
+      body::after{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;opacity:.5;
+        background-image:
+          repeating-linear-gradient(180deg,rgba(120,220,255,.025) 0,rgba(120,220,255,.025) 1px,transparent 1px,transparent 3px),
+          linear-gradient(rgba(120,220,255,.035) 1px,transparent 1px),
+          linear-gradient(90deg,rgba(120,220,255,.035) 1px,transparent 1px);
+        background-size:auto,42px 42px,42px 42px;}
+      .panel{position:relative;z-index:1;
         width:100%;max-width:380px;
-        background:rgba(23,28,36,.66);backdrop-filter:blur(20px) saturate(140%);-webkit-backdrop-filter:blur(20px) saturate(140%);
-        border:1px solid rgba(255,255,255,.07);border-radius:16px;padding:30px 28px 26px;
-        box-shadow:0 1px 2px rgba(0,0,0,.4),0 24px 60px rgba(0,0,0,.45);
-      }
+        background:rgba(13,23,40,.66);backdrop-filter:blur(20px) saturate(140%);-webkit-backdrop-filter:blur(20px) saturate(140%);
+        border:1px solid var(--border);border-radius:16px;padding:30px 28px 26px;
+        box-shadow:0 1px 2px rgba(0,0,0,.4),0 24px 60px rgba(0,0,0,.55);}
       .brand{display:flex;align-items:center;gap:12px;margin-bottom:22px}
-      .logo{width:38px;height:38px;border-radius:10px;background:linear-gradient(145deg,#2b3442,#171c24);
-        border:1px solid var(--border2);display:grid;place-items:center;font-weight:800;font-size:16px;color:var(--text)}
-      .brand-t b{font-size:16px;letter-spacing:.2px;display:block}
-      .brand-t span{font-size:11px;color:var(--text3);letter-spacing:1.2px;text-transform:uppercase}
-      label{display:block;font-size:11.5px;color:var(--text2);margin:14px 0 6px;letter-spacing:.2px}
-      input{width:100%;background:var(--surface3);border:1px solid var(--border2);color:var(--text);
+      .brand svg{width:40px;height:40px;flex-shrink:0;display:block}
+      .brand-t b{font-size:17px;letter-spacing:-.3px;display:block;
+        background:var(--brand);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+      .brand-t span{font-size:11px;color:var(--muted);letter-spacing:1.4px;text-transform:uppercase}
+      label{display:block;font-size:11.5px;color:var(--sub);margin:14px 0 6px;letter-spacing:.2px}
+      input{width:100%;background:var(--surf);border:1px solid var(--border2);color:var(--text);
         border-radius:9px;padding:11px 12px;font:inherit;font-size:14px;outline:none;transition:border .12s,box-shadow .12s}
-      input::placeholder{color:var(--text3)}
-      input:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+      input::placeholder{color:var(--muted)}
+      input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(34,211,238,.14)}
       .remember{display:flex;align-items:center;justify-content:space-between;margin-top:18px;padding-top:16px;border-top:1px solid var(--border)}
-      .remember span.lbl{font-size:11.5px;color:var(--text2);letter-spacing:.2px}
-      .radio-box{display:flex;gap:4px;background:var(--surface3);border:1px solid var(--border2);border-radius:8px;padding:3px}
+      .remember span.lbl{font-size:11.5px;color:var(--sub);letter-spacing:.2px}
+      .radio-box{display:flex;gap:4px;background:var(--surf);border:1px solid var(--border2);border-radius:8px;padding:3px}
       .radio-box input{display:none}
-      .radio-box label{all:unset;cursor:pointer;padding:5px 10px;border-radius:6px;font-size:11.5px;color:var(--text2);margin:0}
-      .radio-box input:checked + label{background:var(--accent);color:#fff}
+      .radio-box label{all:unset;cursor:pointer;padding:5px 10px;border-radius:6px;font-size:11.5px;color:var(--sub);margin:0}
+      .radio-box input:checked + label{background:var(--accent);color:#04140f;font-weight:600}
       button#login-button{all:unset;box-sizing:border-box;cursor:pointer;display:flex;align-items:center;justify-content:center;
-        width:100%;margin-top:22px;padding:12px;border-radius:9px;font-size:14px;font-weight:600;
-        background:var(--accent);color:#fff;text-align:center;transition:background .12s}
-      button#login-button:hover{background:var(--accent2)}
-      .err{display:none;margin-top:14px;padding:10px 12px;border-radius:8px;background:rgba(229,83,75,.1);
-        border:1px solid rgba(229,83,75,.35);color:var(--danger);font-size:12.5px}
-      .foot{margin-top:18px;text-align:center;font-size:11px;color:var(--text3);letter-spacing:.2px}
-      .noscript{max-width:380px;text-align:center;color:var(--text3);font-size:12px;margin-top:16px;line-height:1.6}
+        width:100%;margin-top:22px;padding:12px;border-radius:9px;font-size:14px;font-weight:700;
+        background:var(--brand);color:#04140f;text-align:center;transition:filter .12s}
+      button#login-button:hover{filter:brightness(1.08)}
+      .err{display:none;margin-top:14px;padding:10px 12px;border-radius:8px;background:rgba(244,63,94,.1);
+        border:1px solid rgba(244,63,94,.35);color:var(--danger);font-size:12.5px}
+      .foot{position:relative;z-index:1;margin-top:18px;text-align:center;font-size:11px;color:var(--muted);letter-spacing:.2px}
+      .noscript{max-width:380px;text-align:center;color:var(--muted);font-size:12px;margin-top:16px;line-height:1.6}
     </style>
     <script type="module">import {setRootPrefix} from "../share/js/vars.js";
       setRootPrefix("../");
@@ -77,7 +88,15 @@
       <div id="login-box">
         <div class="panel" id="login">
           <div class="brand">
-            <div class="logo">M</div>
+            <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="MagicBridge">
+              <defs><linearGradient id="mbg1" x1="0" y1="0" x2="100" y2="100" gradientUnits="userSpaceOnUse">
+                <stop offset="0%" stop-color="#8beefc"/><stop offset="100%" stop-color="#0b7a94"/></linearGradient></defs>
+              <path d="M15 40 C15 25 30 20 50 20 C70 20 85 25 85 40 C85 55 72 58 50 58 C28 58 15 55 15 40 Z" fill="none" stroke="url(#mbg1)" stroke-width="5"/>
+              <path d="M50 20 L50 58" stroke="url(#mbg1)" stroke-width="3.4" opacity=".4"/>
+              <circle cx="32" cy="40" r="3.4" fill="url(#mbg1)"/><circle cx="68" cy="40" r="3.4" fill="url(#mbg1)"/>
+              <path d="M22 66 Q50 78 78 66" stroke="url(#mbg1)" stroke-width="4.2" fill="none" opacity=".5"/>
+              <path d="M28 74 Q50 84 72 74" stroke="url(#mbg1)" stroke-width="3.4" fill="none" opacity=".3"/>
+            </svg>
             <div class="brand-t"><b id="login-logo">MagicBridge</b><span>KVM over IP</span></div>
           </div>
 
@@ -87,8 +106,10 @@
           <label for="passwd-input">Password</label>
           <input id="passwd-input" type="password" autocapitalize="off" autocomplete="current-password">
 
-          <label for="code-input">2FA code <span style="color:var(--text3);text-transform:none;letter-spacing:0">(if enabled)</span></label>
-          <input id="code-input" type="text" placeholder="6-digit code" autocomplete="one-time-code" inputmode="numeric" pattern="[0-9]*" maxlength="6">
+          <!-- 2FA field removed from the UI per product decision. Kept as a hidden,
+               always-empty input so kvmd's login main.js (which appends code-input
+               to the password) keeps working without modification. -->
+          <input id="code-input" type="hidden" value="">
 
           <div class="remember">
             <span class="lbl">Stay signed in</span>
