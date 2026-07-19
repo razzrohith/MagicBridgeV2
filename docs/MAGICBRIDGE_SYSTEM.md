@@ -259,7 +259,20 @@ connected):** keyboard E2E via a Caps Lock LED round-trip (host→gadget feedbac
 state restored) and absolute mouse positioning confirmed on the captured screen
 (cursor landed at both corners on command). The full KVM stack — video + keyboard
 + mouse — now works on real hardware. Still pending: WebRTC/H.264 in a real browser
-(headless fell back to MJPEG, which is proven at 1080p). See `TASK_TRACKER.md`.
+(headless fell back to MJPEG, which is proven at 1080p).
+
+**Imaging (handoff item 20), 2026-07-19.** `provision/build-image.sh` arms a golden
+`.img` offline (card stays an untouched backup) — built + tested on a synthetic
+4-partition image, with a `--verify` mode (17 assertions) proven to fail an unarmed
+image. Key divergence from DIY: PiKVM has **4 partitions and root is p3**, so the
+script detects partitions by label/content rather than index (DIY's hardcoded `p2`
+is PiKVM's PST store and would strip nothing); it also empties the MSD partition and
+strips kvmd's own secrets (htpasswd/ipmipasswd/vncpasswd/TLS). **PiKVM does not use
+LUKS** (verified), so that DIY step is skipped. Building this surfaced three latent
+bugs that would each have broken a flashed unit — an uninstalled
+`mb-firstboot.service` (no personalization → shared identity), conditional TLS regen
+(no cert → dead `kvmd-nginx`), and unreset `ipmipasswd`/`vncpasswd` (stock `admin`
+shipped). All fixed. See `docs/IMAGING.md` + `TASK_TRACKER.md`.
 
 ---
 

@@ -71,8 +71,33 @@
   center; no clicks issued on the live target.
 - ⏳ Still open: WebRTC/H.264 negotiation in a REAL browser (headless fell back to
   MJPEG — MJPEG path is proven at 1080p); "Video FPS" readout shows "—" on the
-  MJPEG-fallback path (cosmetic). Minor: MAC/hostname across a real reboot; a full
-  clean-flash image build.
+  MJPEG-fallback path (cosmetic). Minor: MAC/hostname across a real reboot.
+
+### 💿 Flashable image tooling — handoff item 20 (2026-07-19)
+- **`provision/build-image.sh` built + tested** (`bf64f3f`). Arms a golden-unit `.img`
+  OFFLINE (card stays an untouched backup). Detects partitions by **label/content,
+  never index** — PiKVM has 4 partitions and root is **p3**; DIY hardcodes p2, which
+  here is the 256M PST store, so DIY's script would strip *nothing*. Empties the MSD
+  partition (uploaded ISOs). Hard-fails on LUKS. `--verify` asserts 17 strips.
+- **LUKS: NOT used by PiKVM** — verified (empty `crypttab`, no dm-crypt, no
+  `crypto_LUKS`). The DIY de-LUKS step is skipped entirely.
+- **Three latent bugs found + fixed that would each have broken a flashed unit:**
+  1. `mb-firstboot.service` was in the git tree but **never installed** to
+     `/etc/systemd/system` (installer gap). A flashed card would never personalize →
+     every unit sharing SSH keys/machine-id/MAC/TLS. Installed + enabled (verified
+     inert on the golden unit: `ConditionResult=no`); build-image self-heals it too.
+  2. `mb-secret-reset` regenerated TLS only *if a cert existed* — but arming strips
+     certs, so first boot would leave **no** cert and `kvmd-nginx` would fail to
+     start (bricked unit). Now unconditional (`bf64f3f`).
+  3. `ipmipasswd`/`vncpasswd` never reset → every unit shipping PiKVM's stock
+     `admin` credential (factory tell + shared secret). Fixed (`ce2d845`).
+- **Gotchas re-checked:** (a) `/var/log` tmpfs is **755 root:root**, not 1777, and
+  `fs.protected_regular=1` → bug class N/A; our installer also already refuses to run
+  `nginx -t` (gates on `systemctl restart kvmd-nginx`). (b) SIGPIPE guards done
+  earlier (`c302a7b`).
+- ⏳ Needs the physical card: read golden SD → `.img`, arm it, flash a 2nd card, then
+  prove uniqueness (hostname / MAC / SSH host key / machine-id all differ). `pishrink`
+  auto-expand on Arch + read-only root is **unvalidated** — fallback is `xz` + `.img.xz`.
 
 ---
 
