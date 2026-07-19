@@ -41,12 +41,17 @@ for d in /etc/kvmd/nginx/ssl /etc/kvmd/vnc/ssl; do
 done
 
 # 4. Auth back to defaults + drop our secret/identity state (no baked creds/keys).
+# Default login is magicbridge/magicbridge (kept in sync with kvmd.json below,
+# which the sidecars use to call kvmd's API). The stealth panel default password
+# ("stealthbridge") comes from /etc/magicbridge/stealth_auth.json — we only clear
+# the per-unit override in the writable state dir so it falls back to that default.
 if command -v kvmd-htpasswd >/dev/null 2>&1; then
-    info "resetting kvmd login to default admin"
-    printf 'admin\nadmin\n' | kvmd-htpasswd set admin >/dev/null 2>&1 \
-        || echo admin | kvmd-htpasswd set admin >/dev/null 2>&1
+    info "resetting kvmd login to default magicbridge"
+    printf 'magicbridge\nmagicbridge\n' | kvmd-htpasswd set magicbridge >/dev/null 2>&1 \
+        || echo magicbridge | kvmd-htpasswd set magicbridge >/dev/null 2>&1
+    kvmd-htpasswd del admin >/dev/null 2>&1 || true
 fi
-printf '{\n  "user": "admin",\n  "passwd": "admin",\n  "base": "https://127.0.0.1/api"\n}\n' \
+printf '{\n  "user": "magicbridge",\n  "passwd": "magicbridge",\n  "base": "https://127.0.0.1/api"\n}\n' \
     > /etc/magicbridge/kvmd.json 2>/dev/null
 chmod 600 /etc/magicbridge/kvmd.json 2>/dev/null
 : > /etc/kvmd/totp.secret 2>/dev/null

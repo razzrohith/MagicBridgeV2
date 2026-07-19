@@ -137,9 +137,18 @@ phase3_rebrand() {
   # it to the stock PiKVM login (re-showing the 2FA field, no MagicBridge brand).
   # Deploying it here makes a clean install reproduce our login exactly.
   run "install -Dm644 '$INSTALL_ROOT/web/login_index.html' /usr/share/kvmd/web/login/index.html"
+  # kvmd/web login credential → magicbridge/magicbridge (replaces the stock
+  # admin/admin). The login page prefills the 'magicbridge' username, so the
+  # operator only types the password. Kept in sync with /etc/magicbridge/kvmd.json
+  # (Phase 4) which the sidecars use to call kvmd's API.
+  if [ "$DRY_RUN" = 0 ] && command -v kvmd-htpasswd >/dev/null 2>&1; then
+    printf 'magicbridge\nmagicbridge\n' | kvmd-htpasswd set magicbridge >/dev/null 2>&1 \
+      || echo magicbridge | kvmd-htpasswd set magicbridge >/dev/null 2>&1
+    kvmd-htpasswd del admin >/dev/null 2>&1 || true
+  fi
   # MOTD / SSH banner
   run "cp -f '$INSTALL_ROOT/branding/motd' /etc/motd || true"
-  ok "OS rebranded (hostname=${MB_HOSTNAME}, OLED + UI + login themed)"
+  ok "OS rebranded (hostname=${MB_HOSTNAME}, OLED + UI + login themed, login=magicbridge)"
 }
 
 # =====================================================================
@@ -151,10 +160,17 @@ phase4_services() {
   run "mkdir -p /var/lib/magicbridge /etc/magicbridge"
   run "chmod 700 /var/lib/magicbridge"
   if [ ! -f /etc/magicbridge/kvmd.json ] && [ "$DRY_RUN" = 0 ]; then
-    # kvmd API creds used by our sidecars. Defaults match a fresh PiKVM install;
-    # edit this file if you change the kvmd/web password.
-    printf '{\n  "user": "admin",\n  "passwd": "admin",\n  "base": "https://127.0.0.1/api"\n}\n' > /etc/magicbridge/kvmd.json
+    # kvmd API creds used by our sidecars. MUST match the kvmd/web login below
+    # (magicbridge/magicbridge) — the sidecars authenticate to kvmd with these.
+    printf '{\n  "user": "magicbridge",\n  "passwd": "magicbridge",\n  "base": "https://127.0.0.1/api"\n}\n' > /etc/magicbridge/kvmd.json
     chmod 600 /etc/magicbridge/kvmd.json
+  fi
+  # Install-default stealth-panel password ("stealthbridge"). load_config reads
+  # the writable state dir first, so the user can change it in the UI and their
+  # value wins; this only seeds a sensible default on a fresh unit. sha256(salt+pw).
+  if [ ! -f /etc/magicbridge/stealth_auth.json ] && [ "$DRY_RUN" = 0 ]; then
+    printf '{\n  "salt": "7f3a9c1e5b2d8046",\n  "hash": "546ea4e2e41a99878a47c394714aadf07fb6b9fa6c826a2b5033ae850b8ee99b"\n}\n' > /etc/magicbridge/stealth_auth.json
+    chmod 600 /etc/magicbridge/stealth_auth.json
   fi
   for unit in "$INSTALL_ROOT"/systemd/*.service; do
     [ -e "$unit" ] || continue
