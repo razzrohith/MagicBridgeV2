@@ -6,7 +6,7 @@ change lands outside /opt/magicbridge. Run:
 """
 import os
 LOG = os.path.join(os.path.dirname(os.path.abspath(__file__)), "align_pi_log.txt")
-PI = "172.16.20.209"
+PI = "172.16.20.212"
 
 
 def log(m):

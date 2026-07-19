@@ -20,7 +20,7 @@ detect a KVM/Pi. All "PiKVM/kvmd/Raspberry Pi" tells are stripped; on-screen
 brand is plain **MagicBridge**; upstream GPLv3 credit stays in LICENSE/NOTICE.
 
 ## The device
-- Pi @ **172.16.20.209**, SSH **`root` / `root`** (no sudo needed).
+- Pi @ **172.16.20.212**, SSH **`root` / `root`** (no sudo needed).
 - `/opt/magicbridge` on the Pi **IS a git tree** → deploy via **`align_pi.py`**
   (git fetch + reset to origin/main). Quick UI pushes via `deploy_index.py` (SFTP).
 - Dev→GitHub sync: `sync_and_push.py` (Cowork build → `E:\Startup\magicbridge-pikvm`
