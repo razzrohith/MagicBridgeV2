@@ -482,15 +482,28 @@ async def wifi_scan(_):
 
 
 async def update_check(_):
-    """GET /mb/net/update — check for OS/package updates without applying anything."""
-    rc, out = sh("bash", "-c", "checkupdates 2>/dev/null | wc -l", timeout=30)
-    count = out.strip() if rc == 0 and out.strip().isdigit() else None
-    if count is None:
-        rc2, out2 = sh("bash", "-c", "pacman -Qu 2>/dev/null | wc -l", timeout=30)
-        count = out2.strip() if out2.strip().isdigit() else "0"
-    return web.json_response({"ok": True, "updates": int(count),
-                              "detail": ("%s package update(s) available" % count) if count != "0"
-                              else "system is up to date"})
+    """GET /mb/net/update — how many MagicBridge GIT commits are pending. The
+    Apply pulls git (fetch+reset), so the check is git-based too (a pacman check
+    would never see our commits). Classifies the pull as incremental (fast) vs
+    full (structural files changed), matching align_pi's logic."""
+    # git fetch writes .git/FETCH_HEAD, which is on the read-only rootfs.
+    _rw()
+    sh("bash", "-c", "git config --global --add safe.directory /opt/magicbridge; "
+       "cd /opt/magicbridge && git fetch origin main 2>&1", timeout=30)
+    _ro()
+    _rc, behind = sh("bash", "-c", "cd /opt/magicbridge && git rev-list --count HEAD..origin/main 2>/dev/null")
+    n = int(behind.strip()) if behind.strip().isdigit() else 0
+    _rc, cur = sh("bash", "-c", "git -C /opt/magicbridge rev-parse --short HEAD 2>/dev/null")
+    _rc, changed = sh("bash", "-c", "cd /opt/magicbridge && git diff --name-only HEAD..origin/main 2>/dev/null | wc -l")
+    nchanged = int(changed.strip()) if changed.strip().isdigit() else 0
+    _rc, struct = sh("bash", "-c", "cd /opt/magicbridge && git diff --name-only HEAD..origin/main 2>/dev/null "
+                     "| grep -cE '^(systemd/|nginx/|magic-install.sh|kvmd-overrides/)'")
+    is_struct = struct.strip().isdigit() and int(struct.strip()) > 0
+    return web.json_response({"ok": True, "updates": n, "update_available": n > 0,
+                              "commits_behind": n, "changed": nchanged,
+                              "mode": ("full" if is_struct else "incremental"),
+                              "version": cur.strip(), "branch": "main",
+                              "detail": ("%d update%s available" % (n, "" if n == 1 else "s")) if n else "up to date"})
 
 
 async def logs_tail(request):

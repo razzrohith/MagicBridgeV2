@@ -1253,7 +1253,7 @@ body:not(.fs) .fs-hud{display:none!important}
       if(m==='GET'){const s=await g('/mb/net/status');return J({enabled:!!(s&&s.lockdown)});}
       const r=await p('/mb/net/lockdown',{on:!!b.enabled});return J({ok:!!(r&&r.ok),enabled:!!b.enabled});}
     if(path==='/api/update'){
-      if(b.action==='status'){const s=await g('/mb/net/update');return J({ok:true,updates:(s&&s.updates)||0,detail:(s&&s.detail)||'',current:'',latest:''});}
+      if(b.action==='status'){const s=(await g('/mb/net/update'))||{};return J({ok:true,update_available:!!s.update_available,commits_behind:s.commits_behind||0,changed:s.changed||0,mode:s.mode||'full',version:s.version||'',branch:s.branch||'main',updates:s.updates||0,detail:s.detail||''});}
       if(b.action==='update'){const r=await p('/mb/net/update/apply');return J({ok:!!(r&&r.ok),out:(r&&r.detail)||''});}
       return J({ok:true});}
     if(path==='/api/ai/settings'){
