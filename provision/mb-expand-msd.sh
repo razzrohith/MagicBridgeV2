@@ -76,13 +76,15 @@ sleep 1
 
 # Always leave the filesystem CLEAN, whatever happens, so the boot-time mount
 # (nofail, errors=remount-ro) never trips on a dirty/half-resized fs.
-e2fsck -f -p "$MSDDEV" >/dev/null 2>&1
+e2fsck -f -p "$MSDDEV" >/dev/null 2>&1   # resize2fs requires a clean fs
 if resize2fs "$MSDDEV" >/dev/null 2>&1; then
     log "MSD grown to $(blockdev --getsize64 "$MSDDEV" 2>/dev/null) bytes"
 else
     log "resize2fs failed - MSD stays at its current size (boot is safe: nofail)"
 fi
-e2fsck -f -p "$MSDDEV" >/dev/null 2>&1   # re-clean after the resize attempt
+# NOTE: no forced `e2fsck -f` AFTER resize — on a large (e.g. 232 GB) fs that full
+# check can take minutes; resize2fs already leaves the fs consistent, and this
+# script must never be slow enough to matter to whatever calls it.
 
 mount "$MP" 2>/dev/null
 exit 0

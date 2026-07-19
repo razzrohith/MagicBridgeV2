@@ -56,14 +56,14 @@ if command -v kvmd-edidconf >/dev/null 2>&1; then
         --set-monitor-serial "$monser" --apply >/dev/null 2>&1
 fi
 
-# 4b. grow the virtual-media (MSD) partition to fill THIS card. A distributable
-#     image ships it shrunk (that is what keeps the .img small enough to flash on
-#     any card); this restores full capacity per unit. No-ops on a non-shrunk unit,
-#     and every failure path is benign (worst case: a smaller MSD).
-if [ -x "$ROOT/provision/mb-expand-msd.sh" ] || [ -f "$ROOT/provision/mb-expand-msd.sh" ]; then
-    echo "expanding MSD partition"
-    bash "$ROOT/provision/mb-expand-msd.sh"
-fi
+# 4b. MSD growth is DELIBERATELY NOT done here. Resizing a large (e.g. 232 GB)
+#     ext4 fs on a slow SD can exceed mb-firstboot's TimeoutStartSec, which would
+#     kill this unit before it writes the done-marker below — and then every boot
+#     re-runs first-boot, re-wiping the just-entered WiFi (a provisioning LOOP).
+#     The virtual-media partition is non-essential (PIMSD is `nofail`), so leaving
+#     it small is harmless; grow it later with mb-expand-msd.sh (run once the unit
+#     is up, out of any boot-critical path). mb-firstboot must stay fast + always
+#     reach the marker below so WiFi provisioning sticks.
 
 # 5. re-apply branding (OLED text, theme) from branding.env
 echo "applying branding"
