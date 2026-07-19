@@ -63,6 +63,11 @@ info "clearing saved WiFi + MAC persistence"
 printf 'ctrl_interface=/run/wpa_supplicant\nupdate_config=1\ncountry=US\n' \
     > /etc/wpa_supplicant/wpa_supplicant-wlan0.conf 2>/dev/null
 rm -f /etc/systemd/network/70-mb-*.link 2>/dev/null
+# Reset hostname to a placeholder tell so mb-anon-defaults regenerates a fresh
+# per-unit DESKTOP-XXXXXXX on this clone (the builder's name must not persist).
+info "resetting hostname (regenerated per unit)"
+hostnamectl set-hostname magicbridge 2>/dev/null
+printf 'magicbridge\n' > /etc/hostname 2>/dev/null
 
 # 7. Tailscale — don't inherit the builder's node identity.
 info "clearing Tailscale state"

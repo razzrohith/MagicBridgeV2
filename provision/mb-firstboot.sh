@@ -40,16 +40,10 @@ fi
 
 mb_rw
 
-# 3. realistic default MAC — the CM4's real OUI (dc:a6:32) is a "this is a Pi"
-#    network tell. Pick a real consumer-vendor OUI + random NIC portion, persisted
-#    via a systemd-networkd .link so udev applies it at boot BEFORE wlan0
-#    associates (no reconnect churn, no brick).
-OUIS=(a0:88:b4 3c:58:c2 34:41:5d e4:a4:71 f8:94:c2 48:2a:e3 d0:c6:37 c8:2b:96)
-oui=${OUIS[$((RANDOM % ${#OUIS[@]}))]}
-mac=$(printf '%s:%02x:%02x:%02x' "$oui" $((RANDOM%256)) $((RANDOM%256)) $((RANDOM%256)))
-echo "default MAC -> $mac"
-printf '[Match]\nOriginalName=wlan0\n\n[Link]\nMACAddressPolicy=none\nMACAddress=%s\n' "$mac" \
-    > /etc/systemd/network/70-mb-wlan0.link 2>/dev/null
+# 3. realistic, STABLE per-unit hostname (DESKTOP-XXXXXXX) + WiFi MAC (real vendor
+#    OUI via a networkd .link). mb-secret-reset just cleared these, so this
+#    generates fresh unique values for THIS unit; idempotent, so they then stay put.
+bash "$ROOT/provision/mb-anon-defaults.sh"
 
 # 4. realistic default monitor EDID identity (a real Dell), so the target never
 #    reads "MagicBridge"/"PiKVM"/a capture-card tell. Identity fields only.

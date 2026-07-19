@@ -123,8 +123,10 @@ phase3_rebrand() {
   say "Phase 3 — rebrand → MagicBridge"
   # shellcheck disable=SC1091
   source "$INSTALL_ROOT/branding/branding.env"
-  # hostname + mDNS
-  run "hostnamectl set-hostname '${MB_HOSTNAME}' || true"
+  # Realistic anonymity defaults: a stable per-unit DESKTOP-XXXXXXX hostname +
+  # vendor MAC, NOT the pikvm/magicbridge tells. Idempotent, so re-running the
+  # installer never re-brands a realistic name back to a tell (handoff #4,#5b,#5c).
+  run "bash '$INSTALL_ROOT/provision/mb-anon-defaults.sh'"
   run "install -Dm755 '$INSTALL_ROOT/branding/mb-mdns-alias.sh' /usr/local/bin/mb-mdns-alias.sh"
   run "install -Dm755 '$INSTALL_ROOT/provision/mb-oled-msg' /usr/local/bin/mb-oled-msg"
   run "install -Dm644 '$INSTALL_ROOT/systemd/mb-mdns-alias.service' /etc/systemd/system/mb-mdns-alias.service"
@@ -208,6 +210,9 @@ phase6_enable() {
   run "chmod +x '$INSTALL_ROOT/provision/mb-firstboot.sh' 2>/dev/null || true"
   [ -f /etc/systemd/system/mb-firstboot.service ] && run "systemctl enable mb-firstboot.service 2>/dev/null || true"
   run "mkdir -p /var/lib/magicbridge && touch /var/lib/magicbridge/.mb-firstboot-done"
+  # Realistic-defaults boot service (idempotent: keeps stable per-unit hostname + MAC).
+  run "chmod +x '$INSTALL_ROOT/provision/mb-anon-defaults.sh' 2>/dev/null || true"
+  [ -f /etc/systemd/system/mb-anon-defaults.service ] && run "systemctl enable mb-anon-defaults.service 2>/dev/null || true"
   run "systemctl try-restart kvmd || true"
   run "systemctl restart kvmd-oled 2>/dev/null || true"
   ok "MagicBridge enabled"

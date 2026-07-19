@@ -1,0 +1,17 @@
+[Unit]
+Description=MagicBridge realistic anonymity defaults (stable hostname + MAC)
+DefaultDependencies=no
+After=local-fs.target
+Before=network-pre.target systemd-networkd.service NetworkManager.service sysinit.target
+Wants=local-fs.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+# Idempotent: generates a value only if the current one is missing / a tell,
+# then keeps it. Safe to run every boot; nothing re-randomises.
+ExecStart=/bin/bash /opt/magicbridge/provision/mb-anon-defaults.sh
+TimeoutStartSec=30
+
+[Install]
+WantedBy=sysinit.target
