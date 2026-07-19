@@ -1,0 +1,6 @@
+# Force LF on scripts so bash/python never break on the Linux Pi
+*.sh text eol=lf
+*.py text eol=lf
+mb-oled-msg text eol=lf
+mb-mdns-alias.sh text eol=lf
+*.service text eol=lf
