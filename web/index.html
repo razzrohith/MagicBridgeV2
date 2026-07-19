@@ -6,12 +6,13 @@
 <title>MagicBridge</title>
 <style>
 :root{
-  --bg:#0b0e13; --surface:#12161d; --surface2:#171c24; --surface3:#1d232c;
-  --border:#262d38; --border2:#313a47;
-  --text:#e6edf3; --text2:#9aa4b2; --text3:#6b7482;
-  --accent:#5b8cff; --accent2:#3a6fe0; --accent-soft:rgba(91,140,255,.12);
-  --ok:#3fb27f; --warn:#d9a441; --danger:#e5534b;
-  --radius:11px; --shadow:0 1px 2px rgba(0,0,0,.4),0 8px 24px rgba(0,0,0,.22);
+  --bg:#040911; --surface:#070d18; --surface2:#0a1220; --surface3:#0d1728;
+  --border:rgba(140,220,255,.14); --border2:rgba(140,220,255,.30);
+  --text:#f1fbff; --text2:#aecfe0; --text3:#8aa8bd;
+  --accent:#22d3ee; --accent2:#0ea5c4; --accent-l:#8beefc; --accent-soft:rgba(34,211,238,.13);
+  --brand:linear-gradient(135deg,#8beefc 0%,#22d3ee 55%,#0b7a94 100%);
+  --ok:#10b981; --warn:#f59e0b; --danger:#f43f5e; --purple:#a78bfa;
+  --radius:13px; --shadow:0 10px 34px rgba(0,0,0,.55);
 }
 *{box-sizing:border-box}
 html,body{margin:0;height:100%}
@@ -122,13 +123,144 @@ button.btn.danger:hover{background:rgba(229,83,75,.1)}
   font-size:13px;box-shadow:0 10px 30px rgba(0,0,0,.5);max-width:340px}
 .t.ok{border-left-color:var(--ok)}.t.bad{border-left-color:var(--danger)}
 @media(max-width:820px){.app{grid-template-columns:1fr}.side{position:static;height:auto;flex-direction:row;flex-wrap:wrap}.nav{flex-direction:row;flex-wrap:wrap}}
+
+/* ============================================================================
+   MagicBridge cockpit — professional cyan-HUD polish layer (fluid, rich).
+   Cascades over the base rules above; classes/IDs unchanged so all JS works.
+   ========================================================================== */
+html,body{height:100%;height:100dvh}
+body{position:relative;background:var(--bg);overflow-x:hidden}
+/* Fluid gradient-mesh backdrop + faint HUD instrument grid, both fixed. */
+body::before{content:'';position:fixed;inset:0;z-index:-2;pointer-events:none;
+  background:
+    radial-gradient(ellipse 900px 620px at 10% -8%,rgba(34,211,238,.10),transparent 60%),
+    radial-gradient(ellipse 780px 560px at 108% 15%,rgba(14,165,196,.11),transparent 60%),
+    radial-gradient(ellipse 820px 660px at 46% 120%,rgba(11,122,148,.09),transparent 62%),
+    linear-gradient(180deg,#040911 0%,#060c17 55%,#040911 100%);}
+body::after{content:'';position:fixed;inset:0;z-index:-1;pointer-events:none;opacity:.45;
+  background-image:
+    repeating-linear-gradient(180deg,rgba(120,220,255,.022) 0,rgba(120,220,255,.022) 1px,transparent 1px,transparent 3px),
+    linear-gradient(rgba(120,220,255,.03) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(120,220,255,.03) 1px,transparent 1px);
+  background-size:auto,44px 44px,44px 44px;}
+::-webkit-scrollbar{width:8px;height:8px}
+::-webkit-scrollbar-thumb{background:rgba(140,220,255,.18);border-radius:6px;border:2px solid transparent;background-clip:padding-box}
+::-webkit-scrollbar-thumb:hover{background:rgba(140,220,255,.34);background-clip:padding-box}
+
+/* Brand — robot logo + gradient wordmark */
+.brand{padding:4px 6px 20px}
+.logo{width:38px;height:38px;border-radius:11px;background:radial-gradient(120% 120% at 30% 20%,rgba(34,211,238,.16),rgba(13,23,40,.9));
+  border:1px solid var(--border2);box-shadow:inset 0 0 18px rgba(34,211,238,.15),0 4px 14px rgba(0,0,0,.4);overflow:visible}
+.logo svg{width:26px;height:26px;display:block}
+.brand-t b{font-size:15.5px;letter-spacing:-.3px;background:var(--brand);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+.brand-t span{color:var(--text3)}
+
+/* Sidebar nav — animated active indicator bar + glow */
+.side{border-right:1px solid var(--border)}
+.nav button{position:relative;transition:background .16s ease,color .16s ease,transform .12s ease}
+.nav button::before{content:'';position:absolute;left:-12px;top:50%;transform:translateY(-50%) scaleY(0);
+  width:3px;height:20px;border-radius:0 3px 3px 0;background:var(--brand);box-shadow:0 0 10px var(--accent);transition:transform .2s cubic-bezier(.4,1.3,.5,1)}
+.nav button:hover{background:rgba(34,211,238,.06);color:var(--text)}
+.nav button.active{background:rgba(34,211,238,.10);color:var(--accent-l)}
+.nav button.active::before{transform:translateY(-50%) scaleY(1)}
+.nav button.active svg{stroke:var(--accent);filter:drop-shadow(0 0 5px rgba(34,211,238,.5))}
+.side .foot .dot{background:var(--ok);box-shadow:0 0 0 3px rgba(16,185,129,.16),0 0 8px var(--ok)}
+
+/* Header stat chips + title */
+.top{background:rgba(6,12,23,.72);backdrop-filter:blur(14px) saturate(140%);-webkit-backdrop-filter:blur(14px) saturate(140%)}
+.top h1{font-weight:650;letter-spacing:.1px}
+.stat{transition:border-color .16s,transform .12s;font-variant-numeric:tabular-nums}
+.stat:hover{border-color:var(--border2)}
+.stat b{color:var(--accent-l)}
+
+/* Cards — glass, top hairline highlight, fluid hover-lift */
+.page.active{animation:pageIn .26s cubic-bezier(.2,.7,.3,1)}
+@keyframes pageIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+.card{position:relative;border:1px solid var(--border);border-radius:var(--radius);
+  background:linear-gradient(180deg,rgba(15,26,44,.66),rgba(9,16,30,.6));
+  transition:transform .2s cubic-bezier(.2,.7,.3,1),border-color .2s,box-shadow .2s}
+.card::before{content:'';position:absolute;inset:0 0 auto;height:1px;border-radius:var(--radius) var(--radius) 0 0;
+  background:linear-gradient(90deg,transparent,rgba(140,220,255,.35),transparent);opacity:.7}
+.card:hover{transform:translateY(-2px);border-color:var(--border2);box-shadow:0 16px 40px rgba(0,0,0,.5),0 0 0 1px rgba(34,211,238,.06)}
+.card h3{letter-spacing:.1px;display:flex;align-items:center;gap:6px}
+.sec-title{color:var(--accent-l);opacity:.8}
+
+/* Inputs + buttons — cyan focus glow, fluid press */
+input,select{background:rgba(5,11,22,.7);transition:border-color .15s,box-shadow .15s,background .15s}
+input:focus,select:focus{background:rgba(5,11,22,.95)}
+button.btn{background:var(--brand);color:#04140f;font-weight:700;transition:filter .15s,transform .1s,box-shadow .2s;
+  box-shadow:0 4px 16px rgba(34,211,238,.18)}
+button.btn:hover{background:var(--brand);filter:brightness(1.08);box-shadow:0 6px 22px rgba(34,211,238,.3)}
+button.btn:active{transform:translateY(1px)}
+button.btn.ghost{background:transparent;box-shadow:none;color:var(--text)}
+button.btn.ghost:hover{background:rgba(34,211,238,.08);border-color:var(--accent);filter:none}
+button.btn.warn,button.btn.danger{box-shadow:none}
+.chip{transition:border-color .14s,color .14s,background .14s,transform .1s;background:rgba(13,23,40,.7)}
+.chip:hover{border-color:var(--accent);color:var(--accent-l);background:rgba(34,211,238,.08)}
+.chip:active{transform:translateY(1px)}
+.updchip{color:var(--warn)}
+
+/* LEDs — soft glow when live */
+.led{transition:background .2s,box-shadow .2s}
+.led.g{background:var(--ok);box-shadow:0 0 7px rgba(16,185,129,.7)}
+.led.y{background:var(--warn);box-shadow:0 0 7px rgba(245,158,11,.6)}
+.led.r{background:var(--danger);box-shadow:0 0 7px rgba(244,63,94,.6)}
+
+/* Video surface */
+.screen{background:radial-gradient(120% 120% at 50% 40%,#08131d,#03070c);border:1px solid var(--border);
+  box-shadow:inset 0 0 60px rgba(0,0,0,.6)}
+#streamBox.cap{box-shadow:0 0 0 2px var(--accent),0 0 24px rgba(34,211,238,.35)}
+.tag.ok{color:var(--ok);border-color:rgba(16,185,129,.4);background:rgba(16,185,129,.1)}
+.tag.warn{color:var(--warn);border-color:rgba(245,158,11,.4);background:rgba(245,158,11,.1)}
+
+/* Toast — slide/scale in */
+.t{background:rgba(10,18,32,.92);backdrop-filter:blur(12px);border:1px solid var(--border2);border-left:3px solid var(--accent);
+  animation:toastIn .28s cubic-bezier(.2,.8,.3,1)}
+@keyframes toastIn{from{opacity:0;transform:translateX(24px) scale(.96)}to{opacity:1;transform:none}}
+.t.ok{border-left-color:var(--ok)}.t.bad{border-left-color:var(--danger)}
+
+/* Capture release bar (top) + recapture overlay — DIY-style hold-to-exit UX */
+#relbar{position:fixed;top:0;left:0;right:0;z-index:900;height:42px;display:none;
+  align-items:center;justify-content:space-between;padding:0 16px;
+  background:linear-gradient(180deg,rgba(34,211,238,.16),rgba(34,211,238,.04));border-bottom:1px solid var(--border2);
+  backdrop-filter:blur(10px);animation:toastIn .25s ease}
+#relbar.on{display:flex}
+#relbar b{font-size:12px;font-weight:600;color:var(--accent-l);letter-spacing:.3px}
+#relbar .hk{font-size:11px;color:var(--text2)}
+#recapture{position:fixed;inset:0;z-index:1000;display:none;flex-direction:column;align-items:center;justify-content:center;
+  gap:2px;background:rgba(2,6,12,.72);backdrop-filter:blur(8px);cursor:pointer;text-align:center}
+#recapture.on{display:flex}
+.rc-ring{width:52px;height:52px;border-radius:50%;margin-bottom:16px;
+  border:2.5px solid rgba(34,211,238,.18);border-top-color:var(--accent);animation:rcspin 1s linear infinite}
+@keyframes rcspin{to{transform:rotate(360deg)}}
+.rc-title{font-size:19px;font-weight:700;color:var(--text)}
+.rc-sub{font-size:12.5px;color:var(--text2);margin-top:5px}
+.rc-timer{font-size:11px;color:var(--text3);margin-top:10px}
+/* predictive local cursor dot for relative mode */
+#cur-dot{position:fixed;width:12px;height:12px;margin:-6px 0 0 -6px;border-radius:50%;pointer-events:none;z-index:950;display:none;
+  background:rgba(34,211,238,.9);box-shadow:0 0 10px var(--accent),0 0 3px #fff}
+/* Immersive control mode: the video fills the screen when captured (fullscreen). */
+#streamBox:fullscreen{aspect-ratio:auto;width:100vw;height:100vh;border-radius:0;border:0;background:#000}
+#streamBox:-webkit-full-screen{aspect-ratio:auto;width:100vw;height:100vh;border-radius:0;border:0;background:#000}
+#streamBox:fullscreen img,#streamBox:fullscreen video{width:100%;height:100%;object-fit:contain}
+#streamBox:-webkit-full-screen img,#streamBox:-webkit-full-screen video{width:100%;height:100%;object-fit:contain}
 </style>
 </head>
 <body>
 <div class="app">
   <aside class="side">
     <div class="brand">
-      <div class="logo">M</div>
+      <div class="logo">
+        <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="MagicBridge">
+          <defs><linearGradient id="mbg1" x1="0" y1="0" x2="100" y2="100" gradientUnits="userSpaceOnUse">
+            <stop offset="0%" stop-color="#8beefc"/><stop offset="100%" stop-color="#0b7a94"/></linearGradient></defs>
+          <path d="M15 40 C15 25 30 20 50 20 C70 20 85 25 85 40 C85 55 72 58 50 58 C28 58 15 55 15 40 Z" fill="none" stroke="url(#mbg1)" stroke-width="5"/>
+          <path d="M50 20 L50 58" stroke="url(#mbg1)" stroke-width="3.4" opacity=".4"/>
+          <circle cx="32" cy="40" r="3.4" fill="url(#mbg1)"/><circle cx="68" cy="40" r="3.4" fill="url(#mbg1)"/>
+          <path d="M22 66 Q50 78 78 66" stroke="url(#mbg1)" stroke-width="4.2" fill="none" opacity=".5"/>
+          <path d="M28 74 Q50 84 72 74" stroke="url(#mbg1)" stroke-width="3.4" fill="none" opacity=".3"/>
+        </svg>
+      </div>
       <div class="brand-t"><b>MagicBridge</b><span>KVM over IP</span></div>
     </div>
     <nav class="nav" id="nav">
@@ -180,7 +312,19 @@ button.btn.danger:hover{background:rgba(229,83,75,.1)}
           <div class="screen" id="streamBox" tabindex="0">
             <img id="video" alt="">
             <video id="videoRtc" playsinline autoplay muted style="display:none;width:100%;height:100%;object-fit:contain"></video>
-            <div class="ph" id="videoPh"><b>Click the screen</b> to take keyboard &amp; mouse control · press <b>Esc</b> to release</div>
+            <div class="ph" id="videoPh"><b>Click the screen</b> to take keyboard &amp; mouse control · <b>tap Esc</b> is sent to the target · <b>hold Esc</b> to release</div>
+            <!-- Capture HUD (rendered inside the video so it shows in fullscreen control mode) -->
+            <div id="relbar">
+              <b>🔒 In control</b>
+              <span class="hk">tap <b>Esc</b> → target · <b>hold Esc</b> or <b>hold Right-Ctrl</b> to release</span>
+            </div>
+            <div id="recapture" onclick="mbRecapture(event)">
+              <div class="rc-ring"></div>
+              <div class="rc-title">Click to resume control</div>
+              <div class="rc-sub">The browser released control — click to recapture</div>
+              <div class="rc-timer" id="rc-timer"></div>
+            </div>
+            <div id="cur-dot"></div>
           </div>
           <div class="btns" style="margin-top:12px">
             <span class="chip" onclick="combo(['ControlLeft','AltLeft','Delete'])">Ctrl+Alt+Del</span>
@@ -578,19 +722,39 @@ function imgGeo(){const el=activeVideoEl(),r=el.getBoundingClientRect();
   return{x:r.left+(r.width-w)/2,y:r.top+(r.height-h)/2,width:w,height:h};}
 const btnName=b=>({0:"left",2:"right",1:"middle",3:"up",4:"down"}[b]||"left");
 const clamp127=v=>Math.max(-127,Math.min(127,v|0));
-/* --- capture / controls --- */
-/* Simple, reliable capture model: click the screen to take control, press Esc
-   to release. (To send Esc to the target, use the "Esc" quick-action chip.) */
+/* --- capture / controls (Esc = HOLD-to-exit) --------------------------------
+   Click the screen to take control. A single Esc TAP is forwarded to the target;
+   only HOLDING Esc (~2.5s) — or holding Right-Ctrl — releases control. Capture
+   goes fullscreen with the Keyboard Lock API so the browser doesn't force-exit
+   on a quick Esc tap (its unblockable safety rule). Absolute mode needs neither
+   and works windowed; relative mode relies on the lock (Chrome/Edge). */
+const ESC_HOLD_MS=2500, RCTRL_HOLD_MS=2000;
+let _escDown=0,_escHoldTimer=null,_rCtrlDown=0,_intentional=false,_escTime=0,_rcTimer=null,_kbLock=false,_cx=0,_cy=0;
 function captureOn(){const box=$("#streamBox"),btn=$("#capBtn");if(kvmCap)return;
-  kvmCap=true;btn.textContent="Release";btn.classList.add("ghost");box.classList.add("cap");
+  kvmCap=true;_intentional=false;btn.textContent="Release";btn.classList.add("ghost");box.classList.add("cap");
   box.style.cursor=kvmAbs?"crosshair":"none";box.focus();setLed("ledKbd","g");setLed("ledMouse","g");
-  toast("Screen control active — press Esc to release");}
+  hideRecapture();$("#relbar").classList.add("on");
+  if(!document.fullscreenElement&&box.requestFullscreen){box.requestFullscreen().catch(()=>{});}
+  if(navigator.keyboard&&navigator.keyboard.lock){navigator.keyboard.lock(["Escape"]).then(()=>{_kbLock=true;}).catch(()=>{_kbLock=false;});}
+  if(!kvmAbs&&box.requestPointerLock){const p=box.requestPointerLock({unadjustedMovement:true});if(p&&p.catch)p.catch(()=>{try{box.requestPointerLock();}catch(e){}});}
+  const r=box.getBoundingClientRect();_cx=r.width/2;_cy=r.height/2;
+  toast("In control — tap Esc to send it to the target · hold Esc to release");}
 function captureOff(){const box=$("#streamBox"),btn=$("#capBtn");
   kvmCap=false;btn.textContent="Capture";btn.classList.remove("ghost");box.classList.remove("cap");
   box.style.cursor="default";setLed("ledKbd","");setLed("ledMouse","");
+  $("#relbar").classList.remove("on");const cd=$("#cur-dot");if(cd)cd.style.display="none";
+  clearTimeout(_escHoldTimer);_escDown=0;_rCtrlDown=0;
+  if(navigator.keyboard&&navigator.keyboard.unlock){try{navigator.keyboard.unlock();}catch(e){}}_kbLock=false;
+  ["ShiftLeft","ControlLeft","AltLeft","MetaLeft","ControlRight"].forEach(c=>sendKey(c,false)); // don't let mods stick
   if(document.pointerLockElement)document.exitPointerLock();
-  if(document.fullscreenElement)document.exitFullscreen().catch(()=>{});toast("Control released");}
+  if(document.fullscreenElement)document.exitFullscreen().catch(()=>{});}
 function kvmToggleCapture(){if(kvmCap)captureOff();else captureOn();}
+function releaseControl(msg){_intentional=true;if(msg)toast(msg);captureOff();}
+function showRecapture(){const rc=$("#recapture");if(!rc)return;rc.classList.add("on");let n=4;
+  $("#rc-timer").textContent="Auto-dismiss in "+n+"s";clearInterval(_rcTimer);
+  _rcTimer=setInterval(()=>{n--;if(n<=0)hideRecapture();else $("#rc-timer").textContent="Auto-dismiss in "+n+"s";},1000);}
+function hideRecapture(){const rc=$("#recapture");if(rc)rc.classList.remove("on");clearInterval(_rcTimer);}
+function mbRecapture(e){if(e)e.stopPropagation();hideRecapture();captureOn();}
 /* Switch the kvmd HID mouse gadget (usb=absolute, usb_rel=relative). kvmd
    defaults to absolute and ignores relative reports until the gadget is
    switched — this is why relative mode was dead before. */
@@ -686,31 +850,44 @@ function oskPress(code,el){
   mods.slice().reverse().forEach(m=>sendKey(m,false));
   OSK_MODS.clear();$$("#osk .key.mod.on").forEach(x=>x.classList.remove("on"));}
 function toggleOsk(){const box=$("#osk");buildOsk();const show=box.style.display==="none";box.style.display=show?"":"none";toast(show?"On-screen keyboard — keys go straight to the target":"");}
-/* --- wire input on the stream box --- */
+/* --- wire input on the stream box (Esc = hold-to-exit) --- */
 (function(){const box=$("#streamBox");if(!box)return;
   box.addEventListener("contextmenu",e=>e.preventDefault());
   const locked=()=>document.pointerLockElement===box;
   const active=()=>kvmCap||locked();
   box.addEventListener("mousedown",e=>{
-    if(!kvmAbs){ // relative mouse: clicking the screen locks the pointer (that IS taking control)
-      if(!locked()){e.preventDefault();captureOn();if(box.requestPointerLock)box.requestPointerLock();return;}
+    if(!kvmAbs){ // relative: clicking the screen takes control (captureOn locks the pointer)
+      if(!locked()){e.preventDefault();captureOn();return;}
       e.preventDefault();sendBtn(btnName(e.button),true);return;}
-    // absolute mouse: click the screen to take control; the click also passes through
-    if(!kvmCap)captureOn();
+    if(!kvmCap)captureOn();                       // absolute: click takes control; click also passes through
     e.preventDefault();box.focus();sendBtn(btnName(e.button),true);});
   box.addEventListener("mouseup",e=>{if(!active())return;e.preventDefault();sendBtn(btnName(e.button),false);});
   box.addEventListener("mousemove",e=>{
     if(kvmAbs){if(!kvmCap)return;const g=imgGeo();sendMove(remap(e.clientX-g.x,0,g.width-1,-32768,32767),remap(e.clientY-g.y,0,g.height-1,-32768,32767));}
-    else if(locked()){sendRel(clamp127(e.movementX),clamp127(e.movementY));}});
+    else if(locked()){sendRel(clamp127(e.movementX),clamp127(e.movementY));
+      const r=box.getBoundingClientRect();_cx=Math.max(0,Math.min(r.width,_cx+e.movementX));_cy=Math.max(0,Math.min(r.height,_cy+e.movementY));
+      const d=$("#cur-dot");if(d){d.style.display="block";d.style.left=(r.left+_cx)+"px";d.style.top=(r.top+_cy)+"px";}}});
   box.addEventListener("wheel",e=>{if(!active())return;e.preventDefault();sendWheel(0,e.deltaY>0?-5:5);},{passive:false});
-  box.addEventListener("keydown",e=>{if(!active())return;e.preventDefault();
-    if(e.code==="Escape"){captureOff();return;}  // Esc releases control (use the Esc chip to send Esc to the target)
-    if(!e.repeat)sendKey(e.code,true);});
-  box.addEventListener("keyup",e=>{if(!active())return;e.preventDefault();if(e.code==="Escape")return;sendKey(e.code,false);});
-  // If the pointer lock drops (e.g. Esc in relative mode), release control cleanly.
+  // Keyboard at document level so it works in fullscreen control mode.
+  document.addEventListener("keydown",e=>{if(!active())return;
+    if(e.code==="Escape"){e.preventDefault();_escTime=Date.now();
+      if(!_escDown){_escDown=Date.now();sendKey("Escape",true);clearTimeout(_escHoldTimer);   // tap reaches the target
+        _escHoldTimer=setTimeout(()=>{sendKey("Escape",false);releaseControl("Control released — click the screen to resume");_escDown=0;},ESC_HOLD_MS);}
+      return;}
+    if(e.code==="ControlRight"){if(!_rCtrlDown)_rCtrlDown=Date.now();e.preventDefault();return;}
+    if(_rCtrlDown){sendKey("ControlRight",true);_rCtrlDown=0;}   // RCtrl held + another key → send RCtrl through
+    e.preventDefault();if(!e.repeat)sendKey(e.code,true);});
+  document.addEventListener("keyup",e=>{if(!active())return;
+    if(e.code==="Escape"){e.preventDefault();clearTimeout(_escHoldTimer);_escDown=0;sendKey("Escape",false);return;}  // released early = a tap
+    if(e.code==="ControlRight"){const held=Date.now()-_rCtrlDown;_rCtrlDown=0;e.preventDefault();
+      if(held>=RCTRL_HOLD_MS)releaseControl("Control released");
+      else{sendKey("ControlRight",true);setTimeout(()=>sendKey("ControlRight",false),60);}return;}
+    e.preventDefault();sendKey(e.code,false);});
   document.addEventListener("pointerlockchange",()=>{const on=locked();
-    if(!on&&!kvmAbs&&kvmCap)captureOff();
-    setLed("ledMouse",(on||kvmCap)?"g":"");setLed("ledKbd",(on||kvmCap)?"g":"");});
+    setLed("ledMouse",(on||kvmCap)?"g":"");setLed("ledKbd",(on||kvmCap)?"g":"");
+    if(!on&&!kvmAbs&&kvmCap&&!_intentional){ if((Date.now()-_escTime)<3000)showRecapture(); captureOff(); }
+    _intentional=false;});
+  document.addEventListener("fullscreenchange",()=>{ if(!document.fullscreenElement&&kvmCap)releaseControl(); });
 })();
 
 /* power */
