@@ -28,17 +28,24 @@ systemd-machine-id-setup >/dev/null 2>&1
 ln -sf /etc/machine-id /var/lib/dbus/machine-id 2>/dev/null
 
 # 3. kvmd TLS cert/key (nginx + vnc) — self-signed, must be unique per unit.
+#    UNCONDITIONAL on purpose: build-image.sh strips these from a distributable
+#    image, so "regenerate only if present" would skip here and leave the unit
+#    with NO cert — kvmd-nginx then fails to start and the flashed unit is dead.
+#    Always (re)create the dir + keypair. Stock PiKVM certs are also identical
+#    across every install of an OS build, so replacing them is a real win.
 for d in /etc/kvmd/nginx/ssl /etc/kvmd/vnc/ssl; do
-    if [ -f "$d/server.key" ] || [ -f "$d/server.crt" ]; then
-        info "regenerating TLS certificate in $d"
-        openssl req -x509 -newkey rsa:2048 -sha256 -days 3650 -nodes \
-            -keyout "$d/server.key" -out "$d/server.crt" \
-            -subj "/CN=magicbridge.local" \
-            -addext "subjectAltName=DNS:magicbridge.local,IP:127.0.0.1" >/dev/null 2>&1
-        chmod 600 "$d/server.key" 2>/dev/null
-        chown kvmd-nginx: "$d/server.key" "$d/server.crt" 2>/dev/null
-    fi
+    info "regenerating TLS certificate in $d"
+    mkdir -p "$d" 2>/dev/null
+    openssl req -x509 -newkey rsa:2048 -sha256 -days 3650 -nodes \
+        -keyout "$d/server.key" -out "$d/server.crt" \
+        -subj "/CN=magicbridge.local" \
+        -addext "subjectAltName=DNS:magicbridge.local,IP:127.0.0.1" >/dev/null 2>&1
+    chmod 600 "$d/server.key" 2>/dev/null
+    chmod 644 "$d/server.crt" 2>/dev/null
 done
+# Hand each cert to the service user that reads it (kvmd-nginx / kvmd-vnc).
+chown kvmd-nginx: /etc/kvmd/nginx/ssl/server.key /etc/kvmd/nginx/ssl/server.crt 2>/dev/null
+chown kvmd-vnc:   /etc/kvmd/vnc/ssl/server.key   /etc/kvmd/vnc/ssl/server.crt   2>/dev/null
 
 # 4. Auth back to defaults + drop our secret/identity state (no baked creds/keys).
 # Default login is magicbridge/magicbridge (kept in sync with kvmd.json below,

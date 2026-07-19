@@ -1,0 +1,239 @@
+#!/usr/bin/env bash
+# ============================================================
+#  build-image.sh — arm a MagicBridge PiKVM .img for distribution.
+#
+#  Takes a raw image read off a fully-working "golden" V4 Mini card and strips
+#  every per-unit secret + identity, then RE-ARMS first-boot so each flashed
+#  card personalizes itself into a unique, anonymous unit:
+#      flash -> boot -> mb-firstboot (regenerate secrets) -> hotspot WiFi setup
+#
+#  Run on a LINUX host as root (WSL2 works; loop devices + mount are required):
+#      wsl -d Ubuntu -u root -e bash /mnt/e/.../build-image.sh <base.img> [out.img]
+#      wsl -d Ubuntu -u root -e bash /mnt/e/.../build-image.sh --verify <img>
+#
+#  ---- Why this is NOT DIY's build-image.sh -------------------------------
+#  DIY = Pi OS, 2 partitions, root on p2, NetworkManager, /etc/magicbridge.
+#  PiKVM V4 Mini = 4 partitions and root is p3:
+#      p1 vfat  PIBOOT -> /boot
+#      p2 ext4  PIPST  -> /var/lib/kvmd/pst   (kvmd persistent store)
+#      p3 ext4         -> /                   <-- the real root
+#      p4 ext4  PIMSD  -> /var/lib/kvmd/msd   (uploaded ISOs - must not ship)
+#  Hardcoding p2 as root (as DIY does) would mount the 256M PST partition and
+#  silently strip NOTHING. So we detect partitions by label/content, never by
+#  index. Secrets are kvmd's (htpasswd/ipmipasswd/vncpasswd/TLS), not DIY's.
+#  LUKS: PiKVM does not use it (verified: empty crypttab, no dm-crypt) - we
+#  still hard-FAIL if a LUKS container ever shows up rather than silently
+#  arming an image whose secrets we did not actually reach.
+# ============================================================
+set -euo pipefail
+
+RED='\033[0;31m'; GRN='\033[0;32m'; YEL='\033[1;33m'; NC='\033[0m'
+ok(){   echo -e "${GRN}✓${NC} $*"; }
+info(){ echo -e "→ $*"; }
+warn(){ echo -e "${YEL}⚠${NC} $*"; }
+die(){  echo -e "${RED}✗${NC} $*"; exit 1; }
+
+MODE="arm"
+if [[ "${1:-}" == "--verify" ]]; then MODE="verify"; shift; fi
+IMG="${1:-}"
+[[ $EUID -eq 0 ]] || die "Run as root (needs loop mount)."
+[[ -f "$IMG" ]]   || die "Usage: $0 <base.img> [out.img]   |   $0 --verify <img>"
+command -v losetup >/dev/null || die "losetup not found (install util-linux)."
+
+OUT="${2:-}"
+if [[ "$MODE" == "arm" ]]; then
+    if [[ -n "$OUT" && "$OUT" != "$IMG" ]]; then
+        info "Copying $IMG -> $OUT (base image stays untouched as your backup)"
+        cp --reflink=auto "$IMG" "$OUT"
+    else
+        OUT="$IMG"; warn "Editing $IMG IN PLACE (pass an output name to keep the base)"
+    fi
+else
+    OUT="$IMG"
+fi
+
+MNT=$(mktemp -d); LOOP=""
+cleanup(){
+    for m in "$MNT/msd" "$MNT/pst" "$MNT/root"; do mountpoint -q "$m" && umount "$m" 2>/dev/null || true; done
+    [[ -n "$LOOP" ]] && losetup -d "$LOOP" 2>/dev/null || true
+    rm -rf "$MNT" 2>/dev/null || true
+}
+trap cleanup EXIT
+mkdir -p "$MNT/root" "$MNT/pst" "$MNT/msd"
+
+info "Attaching image..."
+LOOP=$(losetup --show -fP "$OUT")
+sleep 1   # give udev time to create the pN nodes
+
+# ---- identify partitions by LABEL/content, never by index -----------------
+ROOTPART=""; MSDPART=""; PSTPART=""; BOOTPART=""
+for p in "${LOOP}"p*; do
+    [[ -e "$p" ]] || continue
+    # unset FIRST: the case branches below `continue`, so a stale label from the
+    # previous partition would otherwise leak in and misidentify this one.
+    unset BLK_LABEL BLK_TYPE
+    eval "$(blkid -o export "$p" 2>/dev/null | sed 's/^/BLK_/')" || true
+    lbl="${BLK_LABEL:-}"; typ="${BLK_TYPE:-}"
+    case "$lbl" in
+        PIBOOT) BOOTPART="$p"; continue ;;
+        PIPST)  PSTPART="$p";  continue ;;
+        PIMSD)  MSDPART="$p";  continue ;;
+    esac
+    # unlabelled ext4 -> candidate root; confirm by content
+    if [[ "$typ" == "ext4" ]]; then
+        if mount -o ro "$p" "$MNT/root" 2>/dev/null; then
+            if [[ -d "$MNT/root/etc/kvmd" ]]; then ROOTPART="$p"; fi
+            umount "$MNT/root" 2>/dev/null || true
+        fi
+    fi
+done
+[[ -n "$ROOTPART" ]] || die "Could not find the kvmd root partition (no ext4 containing /etc/kvmd). Is this a PiKVM image?"
+info "root=$ROOTPART  boot=${BOOTPART:-none}  pst=${PSTPART:-none}  msd=${MSDPART:-none}"
+
+# ---- LUKS guard (the trap that bit DIY) ----------------------------------
+for p in "${LOOP}"p*; do
+    [[ -e "$p" ]] || continue
+    if blkid -o value -s TYPE "$p" 2>/dev/null | grep -qi crypto_LUKS; then
+        die "LUKS container on $p. This image ships an encrypted store; arming it
+   blindly would leave a SHARED key inside every flashed unit. De-LUKS it first
+   (luksOpen with the boot-partition keyfile, copy out, delete container+keyfile
+   +crypttab lines, remove the in-container firstboot flags) before re-running."
+    fi
+done
+ok "No LUKS container (expected for PiKVM)"
+
+mount "$ROOTPART" "$MNT/root"
+R="$MNT/root"
+[[ -d "$R/opt/magicbridge" ]] || warn "No /opt/magicbridge in this image - is MagicBridge actually installed on the golden unit?"
+
+# =========================================================================
+#  VERIFY MODE — assert every strip actually took
+# =========================================================================
+if [[ "$MODE" == "verify" ]]; then
+    FAIL=0
+    chk(){ if eval "$2"; then ok "$1"; else echo -e "${RED}✗${NC} $1"; FAIL=1; fi; }
+    echo ""; info "Verifying armed image: $IMG"
+    chk "no SSH host keys"            '! ls "$R"/etc/ssh/ssh_host_* >/dev/null 2>&1'
+    chk "machine-id empty"            '[[ ! -s "$R/etc/machine-id" ]]'
+    chk "no saved WiFi (no ssid=)"    '! grep -qi "ssid=" "$R"/etc/wpa_supplicant/wpa_supplicant-wlan0.conf 2>/dev/null'
+    chk "no spoofed-MAC .link"        '! ls "$R"/etc/systemd/network/70-mb-*.link >/dev/null 2>&1'
+    chk "no Tailscale state"          '[[ ! -e "$R/var/lib/tailscale/tailscaled.state" ]]'
+    chk "first-boot marker removed"   '[[ ! -e "$R/var/lib/magicbridge/.mb-firstboot-done" ]]'
+    chk "mb-firstboot.service present" '[[ -f "$R/etc/systemd/system/mb-firstboot.service" ]]'
+    chk "mb-firstboot ENABLED (sysinit)" '[[ -L "$R/etc/systemd/system/sysinit.target.wants/mb-firstboot.service" ]]'
+    chk "mb-portal ENABLED (multi-user)" '[[ -L "$R/etc/systemd/system/multi-user.target.wants/mb-portal.service" ]]'
+    chk "kvmd TLS stripped (nginx)"   '[[ ! -e "$R/etc/kvmd/nginx/ssl/server.key" ]]'
+    chk "kvmd TLS stripped (vnc)"     '[[ ! -e "$R/etc/kvmd/vnc/ssl/server.key" ]]'
+    chk "no stock admin in ipmipasswd" '! grep -qE "^admin:" "$R/etc/kvmd/ipmipasswd" 2>/dev/null'
+    chk "USB serial override cleared" '[[ ! -e "$R/etc/kvmd/override.d/90-magicbridge-otg.yaml" ]]'
+    chk "no avahi .mb-bak tells"      '! ls "$R"/etc/avahi/services/*.mb-bak >/dev/null 2>&1'
+    chk "defaults KEPT (kvmd.json)"   '[[ -f "$R/etc/magicbridge/kvmd.json" ]]'
+    chk "defaults KEPT (stealth_auth)" '[[ -f "$R/etc/magicbridge/stealth_auth.json" ]]'
+    if [[ -n "$MSDPART" ]]; then
+        mount "$MSDPART" "$MNT/msd" 2>/dev/null || true
+        chk "MSD has no uploaded images" '[[ -z "$(find "$MNT/msd" -maxdepth 1 -type f ! -name ".*" 2>/dev/null)" ]]'
+    fi
+    echo ""
+    [[ $FAIL -eq 0 ]] && ok "ALL CHECKS PASSED — image is safe to distribute" \
+                      || die "Some checks FAILED — do not distribute this image"
+    exit 0
+fi
+
+# =========================================================================
+#  ARM MODE
+# =========================================================================
+info "Stripping per-unit identity + secrets..."
+
+# 1. Host identity
+rm -f "$R"/etc/ssh/ssh_host_* 2>/dev/null || true
+rm -f "$R/var/lib/dbus/machine-id" 2>/dev/null || true
+: > "$R/etc/machine-id"
+
+# 2. kvmd credentials. htpasswd/ipmipasswd/vncpasswd are re-seeded to the
+#    MagicBridge defaults by mb-secret-reset on first boot; ship nothing stock.
+rm -f "$R/etc/kvmd/htpasswd" "$R/etc/kvmd/ipmipasswd" "$R/etc/kvmd/vncpasswd" 2>/dev/null || true
+: > "$R/etc/kvmd/totp.secret" 2>/dev/null || true
+
+# 3. kvmd TLS — stock certs are IDENTICAL across every install of an OS build,
+#    and a clone would share them. mb-secret-reset regenerates unconditionally.
+rm -f "$R"/etc/kvmd/nginx/ssl/server.* "$R"/etc/kvmd/vnc/ssl/server.* 2>/dev/null || true
+
+# 4. Network identity: saved WiFi, spoofed MAC, Tailscale node.
+printf 'ctrl_interface=/run/wpa_supplicant\nupdate_config=1\ncountry=US\n' \
+    > "$R/etc/wpa_supplicant/wpa_supplicant-wlan0.conf" 2>/dev/null || true
+rm -f "$R"/etc/systemd/network/70-mb-*.link 2>/dev/null || true
+rm -f "$R/var/lib/tailscale/tailscaled.state" 2>/dev/null || true
+
+# 5. Our per-unit runtime state + USB serial override (regenerated per unit).
+rm -f "$R"/var/lib/magicbridge/net.json "$R"/var/lib/magicbridge/stealth.json \
+      "$R"/var/lib/magicbridge/stealth_auth.json "$R"/var/lib/magicbridge/agent.json 2>/dev/null || true
+rm -f "$R/etc/kvmd/override.d/90-magicbridge-otg.yaml" 2>/dev/null || true
+# Residual mDNS tells: our neutralization leaves a pikvm.service.mb-bak backup
+# that avahi never broadcasts but which still carries PiKVM strings on disk.
+rm -f "$R"/etc/avahi/services/*.mb-bak 2>/dev/null || true
+
+# 6. Hostname back to a placeholder TELL so mb-anon-defaults regenerates a fresh
+#    realistic DESKTOP-XXXXXXX per unit (it only replaces a known tell).
+printf 'magicbridge\n' > "$R/etc/hostname" 2>/dev/null || true
+
+# 7. Logs / history — nothing personal ships.
+rm -rf "$R"/var/log/* 2>/dev/null || true
+rm -f  "$R/root/.bash_history" 2>/dev/null || true
+
+# 8. RE-ARM first boot: drop the marker + make sure the service is installed AND
+#    enabled in the RIGHT target. mb-firstboot is WantedBy=sysinit.target (NOT
+#    multi-user like DIY's) - wrong target = personalization silently never runs.
+rm -f "$R/var/lib/magicbridge/.mb-firstboot-done" 2>/dev/null || true
+mkdir -p "$R/var/lib/magicbridge" 2>/dev/null || true; chmod 700 "$R/var/lib/magicbridge" 2>/dev/null || true
+# Self-heal the known installer gap: unit present in the git tree but never
+# installed to /etc/systemd/system.
+if [[ ! -f "$R/etc/systemd/system/mb-firstboot.service" && -f "$R/opt/magicbridge/systemd/mb-firstboot.service" ]]; then
+    install -Dm644 "$R/opt/magicbridge/systemd/mb-firstboot.service" \
+                   "$R/etc/systemd/system/mb-firstboot.service"
+    warn "mb-firstboot.service was missing from the image - installed it from the tree"
+fi
+if [[ -f "$R/etc/systemd/system/mb-firstboot.service" ]]; then
+    mkdir -p "$R/etc/systemd/system/sysinit.target.wants"
+    ln -sf ../mb-firstboot.service "$R/etc/systemd/system/sysinit.target.wants/mb-firstboot.service"
+    ok "mb-firstboot enabled (sysinit.target)"
+else
+    die "mb-firstboot.service missing and not in the tree - the flashed unit would NEVER personalize."
+fi
+if [[ -f "$R/etc/systemd/system/mb-portal.service" ]]; then
+    mkdir -p "$R/etc/systemd/system/multi-user.target.wants"
+    ln -sf ../mb-portal.service "$R/etc/systemd/system/multi-user.target.wants/mb-portal.service"
+    ok "mb-portal enabled (multi-user.target) - hotspot comes up when there's no WiFi"
+else
+    warn "mb-portal.service missing - a flashed unit will have no WiFi onboarding hotspot"
+fi
+ok "Root partition stripped + first boot re-armed"
+
+# 9. MSD partition: the golden unit's uploaded ISO images. Large + personal;
+#    never ship them. (kvmd-specific; DIY has no equivalent.)
+if [[ -n "$MSDPART" ]]; then
+    mount "$MSDPART" "$MNT/msd"
+    find "$MNT/msd" -mindepth 1 -maxdepth 1 ! -name 'lost+found' -exec rm -rf {} + 2>/dev/null || true
+    sync; umount "$MNT/msd"
+    ok "MSD partition emptied (no uploaded ISOs ship)"
+fi
+
+# 10. PST partition: kvmd's persistent store. Normally empty; warn if not.
+if [[ -n "$PSTPART" ]]; then
+    mount "$PSTPART" "$MNT/pst" 2>/dev/null || true
+    if [[ -n "$(find "$MNT/pst/data" -mindepth 1 2>/dev/null)" ]]; then
+        warn "PST (kvmd persistent store) is NOT empty - inspect it before shipping"
+    else
+        ok "PST partition clean"
+    fi
+    umount "$MNT/pst" 2>/dev/null || true
+fi
+
+sync
+umount "$MNT/root"; losetup -d "$LOOP"; LOOP=""; trap - EXIT; rm -rf "$MNT"
+
+echo ""
+ok "Armed image ready: $OUT"
+echo "  Verify it:  $0 --verify $OUT"
+echo "  Shrink it:  pishrink.sh $OUT      (see docs/IMAGING.md for the caveat)"
+echo "  Flash it:   Raspberry Pi Imager -> 'Use custom' -> $OUT (skip OS customization)"
+echo "  First boot: OLED 'please wait' -> hotspot 'MagicBridge-Setup' -> enter WiFi."
