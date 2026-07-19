@@ -45,10 +45,15 @@
       do it on the next natural reboot.
 
 ### Open engineering tasks (nice-to-have / hardening)
-- [ ] **Fold the `/usr/share/kvmd/web/` rebrands into `magic-install.sh`** — login page, native
-      index/kvm/vnc rebrands, and `janus.js` fetch live outside the git tree, so a kvmd update
-      or fresh flash reverts them. Bake `rebrand_login.py` + `rebrand_native.py` + `get_janus.py`
-      logic into the installer. *(Priority: medium — affects reproducibility on a fresh flash.)*
+- [x] **Login page folded into `magic-install.sh`** (2026-07-18) — phase 3 now deploys
+      `web/login_index.html` → `/usr/share/kvmd/web/login/index.html`, so a fresh flash reproduces
+      the branded, 2FA-free login. Installer `REPO_URL`/`RAW_URL` fixed to `magicbridge-pikvm`;
+      installer's own `MagicBridgeV2`/`V2` strings rebranded.
+- [ ] **Native `/kvm/` fallback still shows PiKVM tells** (41 on-device) — kvmd's own multi-file
+      view, reverts on kvmd update. Controller-facing only (not target-facing), rarely used
+      (our cockpit is default). Rebrand via installer or hide the fallback link. *(Priority: low.)*
+- [ ] **Fresh-install NOT end-to-end tested** — installer is correct by inspection + syntax-checked,
+      but hasn't been run on a clean PiKVM flash (no spare device). Verify on the next reimage.
 - [ ] **nginx RAM-log EACCES** (from V1, may or may not exist on V2) — `nginx -t` can fail
       opening its access log; a cold restart could then fail. Check `/etc/logrotate.d/` for a
       `su`/`create` directive. *(Priority: low, but it's the only front door — confirm before

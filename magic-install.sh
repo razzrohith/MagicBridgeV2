@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 # =====================================================================
-#  MagicBridgeV2 — the one magic command
-#  Turns a stock PiKVM OS install into a fully-branded MagicBridgeV2 unit.
+#  MagicBridge — the one magic command
+#  Turns a stock PiKVM OS install into a fully-branded MagicBridge unit.
 #
 #  Usage (on the V4 Mini, after flashing official PiKVM OS + first boot):
-#     curl -fsSL https://raw.githubusercontent.com/razzrohith/MagicBridgeV2/main/magic-install.sh | sudo bash
+#     curl -fsSL https://raw.githubusercontent.com/razzrohith/magicbridge-pikvm/main/magic-install.sh | sudo bash
 #  or, from a local clone:
 #     sudo ./magic-install.sh [--branch main] [--no-reboot] [--update] [--dry-run]
 #
@@ -14,8 +14,8 @@
 set -Eeuo pipefail
 
 # ---- constants ------------------------------------------------------
-REPO_URL="https://github.com/razzrohith/MagicBridgeV2.git"
-RAW_URL="https://raw.githubusercontent.com/razzrohith/MagicBridgeV2"
+REPO_URL="https://github.com/razzrohith/magicbridge-pikvm.git"
+RAW_URL="https://raw.githubusercontent.com/razzrohith/magicbridge-pikvm"
 INSTALL_ROOT="/opt/magicbridge"
 BRANCH="main"
 DO_REBOOT=1
@@ -33,12 +33,12 @@ run()  { if [ "$DRY_RUN" = 1 ]; then printf '%s  [dry-run] %s%s\n' "$c_dim" "$*"
 
 banner() {
 cat <<'B'
-   __  __             _      ____       _     _            ___
-  |  \/  | __ _  __ _(_) ___| __ ) _ __(_) __| | __ _  ___|__ \
-  | |\/| |/ _` |/ _` | |/ __|  _ \| '__| |/ _` |/ _` |/ _ \ / /
-  | |  | | (_| | (_| | | (__| |_) | |  | | (_| | (_| |  __// /_
-  |_|  |_|\__,_|\__, |_|\___|____/|_|  |_|\__,_|\__, |\___|____|
-               |___/                           |___/  V2
+   __  __             _      ____       _     _
+  |  \/  | __ _  __ _(_) ___| __ ) _ __(_) __| | __ _  ___
+  | |\/| |/ _` |/ _` | |/ __|  _ \| '__| |/ _` |/ _` |/ _ \
+  | |  | | (_| | (_| | | (__| |_) | |  | | (_| | (_| |  __/
+  |_|  |_|\__,_|\__, |_|\___|____/|_|  |_|\__,_|\__, |\___|
+               |___/                           |___/
 B
   printf '%s  Remote control, reimagined.%s\n\n' "$c_dim" "$c_reset"
 }
@@ -69,9 +69,9 @@ done
 phase0_preflight() {
   say "Phase 0 — preflight checks"
   [ "$(id -u)" = 0 ] || die "run as root (sudo)."
-  # Must be PiKVM OS with kvmd. This is the whole premise of V2.
+  # Must be PiKVM OS with kvmd. This is the whole premise of MagicBridge PiKVM.
   if ! command -v kvmd >/dev/null 2>&1 && [ ! -d /etc/kvmd ]; then
-    die "kvmd not found. MagicBridgeV2 installs on top of the official PiKVM OS.
+    die "kvmd not found. MagicBridge installs on top of the official PiKVM OS.
         Flash the PiKVM OS image first, boot once, then re-run this."
   fi
   # detect read-only rootfs
@@ -80,10 +80,10 @@ phase0_preflight() {
 }
 
 # =====================================================================
-#  Phase 1 — fetch MagicBridgeV2 into place
+#  Phase 1 — fetch MagicBridge into place
 # =====================================================================
 phase1_fetch() {
-  say "Phase 1 — fetch MagicBridgeV2 ($BRANCH)"
+  say "Phase 1 — fetch MagicBridge ($BRANCH)"
   fs_rw
   run "mkdir -p '$INSTALL_ROOT'"
   if [ -d "$SELF_DIR/services" ] && [ -f "$SELF_DIR/branding/branding.env" ]; then
@@ -94,7 +94,7 @@ phase1_fetch() {
   else
     run "git clone --depth 1 -b '$BRANCH' '$REPO_URL' '$INSTALL_ROOT'"
   fi
-  ok "MagicBridgeV2 tree in $INSTALL_ROOT"
+  ok "MagicBridge tree in $INSTALL_ROOT"
 }
 
 # =====================================================================
@@ -115,10 +115,10 @@ phase2_deps() {
 }
 
 # =====================================================================
-#  Phase 3 — REBRAND the OS into MagicBridgeV2
+#  Phase 3 — REBRAND the OS into MagicBridge
 # =====================================================================
 phase3_rebrand() {
-  say "Phase 3 — rebrand → MagicBridgeV2"
+  say "Phase 3 — rebrand → MagicBridge"
   # shellcheck disable=SC1091
   source "$INSTALL_ROOT/branding/branding.env"
   # hostname + mDNS
@@ -127,13 +127,18 @@ phase3_rebrand() {
   run "install -Dm644 '$INSTALL_ROOT/systemd/mb-mdns-alias.service' /etc/systemd/system/mb-mdns-alias.service"
   # OLED splash + web UI branding are applied by the branding applier
   run "python3 '$INSTALL_ROOT/branding/apply_branding.py' --root '$INSTALL_ROOT'"
+  # Branded login page. It lives in kvmd's web dir (/usr/share/kvmd/web/login),
+  # OUTSIDE the git tree, so a fresh flash or a kvmd update would otherwise revert
+  # it to the stock PiKVM login (re-showing the 2FA field, no MagicBridge brand).
+  # Deploying it here makes a clean install reproduce our login exactly.
+  run "install -Dm644 '$INSTALL_ROOT/web/login_index.html' /usr/share/kvmd/web/login/index.html"
   # MOTD / SSH banner
   run "cp -f '$INSTALL_ROOT/branding/motd' /etc/motd || true"
-  ok "OS rebranded (hostname=${MB_HOSTNAME}, OLED + UI themed)"
+  ok "OS rebranded (hostname=${MB_HOSTNAME}, OLED + UI + login themed)"
 }
 
 # =====================================================================
-#  Phase 4 — install MagicBridgeV2 add-on services
+#  Phase 4 — install MagicBridge add-on services
 # =====================================================================
 phase4_services() {
   say "Phase 4 — install add-on services"
@@ -179,7 +184,7 @@ phase5_wire() {
 #  Phase 6 — enable & start
 # =====================================================================
 phase6_enable() {
-  say "Phase 6 — enable MagicBridgeV2"
+  say "Phase 6 — enable MagicBridge"
   # mDNS so magicbridge.local resolves (PiKVM ships avahi masked/off by default)
   run "systemctl unmask avahi-daemon.service avahi-daemon.socket 2>/dev/null || true"
   run "systemctl enable --now avahi-daemon.service 2>/dev/null || true"
@@ -195,7 +200,7 @@ phase6_enable() {
   [ -f /etc/systemd/system/mb-portal.service ] && run "systemctl enable mb-portal.service 2>/dev/null || true"
   run "systemctl try-restart kvmd || true"
   run "systemctl restart kvmd-oled 2>/dev/null || true"
-  ok "MagicBridgeV2 enabled"
+  ok "MagicBridge enabled"
 }
 
 # =====================================================================
@@ -210,7 +215,7 @@ main() {
   phase6_enable
   fs_ro
   echo
-  ok "MagicBridgeV2 install complete."
+  ok "MagicBridge install complete."
   say "Open:  https://${MB_HOSTNAME:-magicbridge}.local/"
   if [ "$UPDATE" = 0 ] && [ "$DO_REBOOT" = 1 ] && [ "$DRY_RUN" = 0 ]; then
     say "Rebooting in 5s to finalise branding (Ctrl-C to skip)…"; sleep 5; reboot

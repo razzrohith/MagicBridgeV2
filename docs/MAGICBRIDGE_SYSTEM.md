@@ -62,9 +62,15 @@ reboot). No hostname/mDNS strings that reveal "pikvm"/"kvm"/"raspberry".
 **"MagicBridge"**. The main web page is deliberately **view-only**; the real
 stealth/identity controls live behind the **stealth panel** (edit mode).
 
-**Data at rest.** `/etc/magicbridge` is **LUKS-encrypted** with boot-time
-auto-unlock; auth/session/nginx logs are **RAM-only (tmpfs)** so nothing
-sensitive is written to the SD card.
+**Data at rest.** Auth/session/nginx logs are **RAM-only (tmpfs)** so nothing
+sensitive is written to the SD card — on **PiKVM this is native**: PiKVM OS mounts
+`/var/log`, `/tmp`, `/run` as tmpfs and keeps the rootfs **read-only**; our config
+(`/etc/magicbridge`, `/var/lib/magicbridge`) is root-only `0600/0700`. **LUKS**
+directory/disk encryption is the **DIY** design goal and is deliberately **NOT** used
+on PiKVM: a headless boot would have to keep the unlock key on the device itself, so
+auto-unlock LUKS is security theater here. On PiKVM the real data-at-rest protection
+is the read-only rootfs + tmpfs logs + root-only configs + physical control of a
+machine you own. (Verified on-device 2026-07-18: `/var/log` is tmpfs, no LUKS.)
 
 **Attribution kept (legal).** Upstream credit (`PiKVM / kvmd (GPLv3)`) stays in
 LICENSE/NOTICE — that is a licence obligation, not a user-facing tell, and is
