@@ -1193,7 +1193,7 @@ body:not(.fs) .fs-hud{display:none!important}
      detects the missing Janus global and no-ops back to MJPEG. -->
 <script src="/static/vendor/adapter.js" defer></script>
 <!-- Use kvmd's OWN janus.js (matches the running gateway version) instead of a
-     bundled copy — loaded as a module and exposed as the global Janus that the
+     bundled copy, loaded as a module and exposed as the global Janus that the
      WebRTC code below expects. -->
 <script type="module">try{const m=await import('/share/js/kvm/janus.js');window.Janus=m.Janus;}catch(e){console.warn('janus.js load failed',e);}</script>
 

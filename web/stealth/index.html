@@ -82,7 +82,7 @@ pre{margin:11px 0 0;max-height:190px;overflow:auto;background:rgba(5,7,13,.85);b
   font-size:12px;box-shadow:0 0 20px rgba(91,140,255,.2);max-width:340px;letter-spacing:.3px}
 .t.ok{border-left-color:var(--ok)}.t.bad{border-left-color:var(--er)}
 
-/* cyan-HUD backdrop + brand polish — matches the cockpit */
+/* cyan-HUD backdrop + brand polish, matches the cockpit */
 body{position:relative;overflow-x:hidden}
 body::before{content:'';position:fixed;inset:0;z-index:-2;pointer-events:none;
   background:
@@ -149,7 +149,7 @@ button.btn{transition:.16s,transform .1s}button.btn:active{transform:translateY(
     <!-- USB IDENTITY -->
     <div class="card">
       <h2><span class="dot"></span>USB identity spoofing</h2>
-      <p class="sub">What the target PC sees the bridge as. Applying rebuilds the USB gadget — briefly re-plugs the emulated device.</p>
+      <p class="sub">What the target PC sees the bridge as. Applying rebuilds the USB gadget, briefly re-plugs the emulated device.</p>
       <div class="presets" id="presets"></div>
       <div class="row">
         <label class="f"><span>Vendor ID</span><input id="vid" placeholder="0x046d"></label>
@@ -192,7 +192,7 @@ button.btn{transition:.16s,transform .1s}button.btn:active{transform:translateY(
     <!-- MONITOR SPOOFING -->
     <div class="card">
       <h2><span class="dot"></span>Monitor spoofing (EDID)</h2>
-      <p class="sub">The display make/model the target reads over HDMI. Presets are real monitors — never a capture-card default.</p>
+      <p class="sub">The display make/model the target reads over HDMI. Presets are real monitors, never a capture-card default.</p>
       <label class="f"><span>Monitor preset</span><select id="monPreset" onchange="monPick()"></select></label>
       <div class="row">
         <label class="f"><span>Vendor (3 letters)</span><input id="monMfc" placeholder="DEL" maxlength="3"></label>
@@ -217,7 +217,7 @@ button.btn{transition:.16s,transform .1s}button.btn:active{transform:translateY(
         <div class="btns"><button class="btn pri" onclick="totpEnable()">Verify &amp; enable</button></div>
       </div>
       <div class="btns" style="margin-top:8px"><button class="btn" onclick="totpGenerate()">Set up 2FA</button><button class="btn dn" onclick="totpDisable()">Disable 2FA</button></div>
-      <div class="hint">VNC exposes the screen to any client on the LAN — leave off for stealth. SSH can clear 2FA if you get locked out.</div>
+      <div class="hint">VNC exposes the screen to any client on the LAN, leave off for stealth. SSH can clear 2FA if you get locked out.</div>
     </div>
 
     <!-- ANONYMITY / NETWORK -->
@@ -320,7 +320,7 @@ async function setStealthPw(){const nw=$("#pwNew").value;if(nw.length<4)return t
   const r=await jpost(MB+"/stealth/password",{password:nw,current:STEALTH_PW});
   toast(r&&r.ok?"Password saved":("Failed: "+((r&&r.error)||"error")),r&&r.ok?"ok":"bad");
   if(r&&r.ok){STEALTH_PW=nw;$("#pwNew").value="";checkLock();}}
-function pwGuard(r){if(r&&r.locked){toast("Locked — enter the stealth password first","bad");checkLock();return true;}return false;}
+function pwGuard(r){if(r&&r.locked){toast("Locked, enter the stealth password first","bad");checkLock();return true;}return false;}
 
 /* ---- USB identity ---- */
 async function loadIdentity(){const r=await jget(MB+"/stealth/identity");if(!r)return;
@@ -336,7 +336,7 @@ async function loadIdentity(){const r=await jget(MB+"/stealth/identity");if(!r)r
 function selectPreset(k){document.querySelectorAll(".preset").forEach(x=>x.classList.toggle("sel",x.dataset.k===k));
   const v=PRESETS[k];if(!v)return;$("#verifyNote").textContent=v.verified?"":"⚠ Researched preset, not hardware-verified against a real descriptor.";}
 function selectedPreset(){const el=document.querySelector(".preset.sel");return el?el.dataset.k:null;}
-async function applyIdentity(){toast("Applying identity — rebuilding gadget…");
+async function applyIdentity(){toast("Applying identity, rebuilding gadget…");
   const r=await jpost(MB+"/stealth/identity",{preset:selectedPreset(),serial:$("#serial").value||null,vendor_id:$("#vid").value,product_id:$("#pid").value,manufacturer:$("#mfr").value,product:$("#prod").value,password:STEALTH_PW});
   if(pwGuard(r))return;toast(r.ok?"Identity applied":("Apply failed: "+(r.error||r.detail||"error")),r.ok?"ok":"bad");loadIdentity();loadStatus();}
 async function randomizeIdentity(){toast("Spoofing a random identity…");
@@ -375,11 +375,11 @@ async function ts(a){
   if(a==="up")toast("Bringing Tailscale up…");
   const r=await jpost(MB+"/net/tailscale",{action:a});
   if(r&&r.login_url){$("#tsLoginBox").style.display="";$("#tsLoginLink").href=r.login_url;$("#tsLoginLink").textContent=r.login_url;
-    toast("Sign-in required — open the link below","");}
+    toast("Sign-in required, open the link below","");}
   else{$("#tsLoginBox").style.display="none";toast("Tailscale "+a,(r&&r.ok)?"ok":"bad");}
   loadStatus();}
-async function tsInstall(){toast("Installing Tailscale — this can take a minute…");const r=await jpost(MB+"/net/tailscale/install");
-  toast(r&&r.ok?(r.already?"Already installed":"Installed — click Bring up to connect"):("Install failed: "+((r&&r.detail)||"").slice(-200)),r&&r.ok?"ok":"bad");
+async function tsInstall(){toast("Installing Tailscale, this can take a minute…");const r=await jpost(MB+"/net/tailscale/install");
+  toast(r&&r.ok?(r.already?"Already installed":"Installed, click Bring up to connect"):("Install failed: "+((r&&r.detail)||"").slice(-200)),r&&r.ok?"ok":"bad");
   loadStatus();}
 async function funnel(on){toast("Configuring Funnel…");const r=await jpost(MB+"/net/tailscale/funnel",{on});toast(r&&r.ok?("Funnel "+(on?"on":"off")):"Funnel: "+((r&&(r.error||r.detail))||"failed"),r&&r.ok?"ok":"bad");}
 async function lockdown(on){const r=await jpost(MB+"/net/lockdown",{on});toast("Lockdown "+(on?"on":"off"),(r&&r.ok)?"ok":"");}
