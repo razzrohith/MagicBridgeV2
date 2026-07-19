@@ -796,6 +796,7 @@ async def led_set(request):
 async def update_apply(_):
     """POST /mb/net/update/apply — git-based self-update of /opt/magicbridge + restart sidecars."""
     oled = None
+    start = time.monotonic()
     try:
         oled = subprocess.Popen(["/usr/local/bin/mb-oled-msg", "--updating"])  # OLED "Updating..." (handoff #19)
     except Exception:
@@ -809,6 +810,15 @@ async def update_apply(_):
     finally:
         _ro()
     sh("systemctl", "reload", "kvmd-nginx", timeout=15)
+    # A tiny pull (e.g. a one-file VERSION bump) finishes in <1s, but kvmd-oled
+    # needs ~2s just to paint one frame — so without a floor the "Updating..."
+    # animation is killed before it ever appears. Hold the display long enough
+    # for a human to actually see it (handoff #19 demo).
+    OLED_MIN_VISIBLE = 5.0
+    if oled:
+        remaining = OLED_MIN_VISIBLE - (time.monotonic() - start)
+        if remaining > 0:
+            await asyncio.sleep(remaining)
     # Stop the OLED animation + hand the display back BEFORE we restart ourselves
     # (restarting magicbridge-net kills this handler, so do it here).
     if oled:

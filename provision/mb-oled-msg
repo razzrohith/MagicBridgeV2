@@ -30,6 +30,7 @@ if [ "$1" = "--updating" ]; then
         dots=$(printf '%*s' $(((i % 3) + 1)) '' | tr ' ' '.')
         kvmd-oled --text "Updating$dots"$'\n'"keep power on" --font-size 13 >/dev/null 2>&1
         i=$((i + 1))
+        sleep 0.6   # pace frames + guard against a busy-spin if a draw returns fast
     done
 fi
 
