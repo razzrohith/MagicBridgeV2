@@ -50,8 +50,20 @@
 - Mechanism: `mb-anon-defaults.sh` + `mb-anon-defaults.service` (boot, idempotent) +
   installer + first-boot + secret-reset. Opt-out: `MB_MAC_AUTOSPOOF`/`MB_HOSTNAME_REALISTIC`.
 
-⏳ Remaining device confirms: MAC/hostname across a real reboot; live video/input once HDMI+USB
-are connected; a full clean-flash image build.
+### 🎥 Live video VERIFIED on-device (HDMI connected, 2026-07-19)
+- HDMI source connected; capture works end-to-end. `v4l2` detects **1920×1080@60**
+  from the source (our Dell EDID makes it output 1080p, honored). ustreamer starts
+  on-demand (kvmd stops it 10s after the last client — the idle 640×480 is just the
+  no-client default), locks to 1080p, and the cockpit shows the **live 1920×1080**
+  frame (MJPEG path confirmed; "No signal" overlay hidden, Status=Live).
+- Fixed a UI carry-over exposed by the live test: transport labels said
+  `WebRTC (C790/CSI)` / `MJPEG (USB dongle)` (DIY board name + nonexistent dongle) →
+  `WebRTC (H.264)` / `MJPEG (fallback)` (commit `1c2f27f`).
+- ⏳ Still open: **HID input** to a target (needs the USB gadget cable to a target
+  PC — not exercised, avoided injecting input into the live source); WebRTC/H.264
+  negotiation in a real browser (headless fell back to MJPEG); "Video FPS" readout
+  shows "—" in MJPEG-fallback (cosmetic). Minor: MAC/hostname across a real reboot;
+  a full clean-flash image build.
 
 ---
 

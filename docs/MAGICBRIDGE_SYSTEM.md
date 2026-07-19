@@ -251,7 +251,11 @@ aborts rc=141 under pipefail, guarded rc=0). **20** imaging = MAC-strip already
 present, `video.mode=auto` N/A, added `*.mb-bak` residual-tell strip. Reconcile
 sweep confirmed the anonymity model holds live: RAM logs, access-log off, no
 `_pikvm` on the wire, realistic stable hostname + persisted vendor MAC, Dell EDID,
-Logitech USB. Still pending hardware (HDMI+USB): live video/HID E2E. See
+Logitech USB. **Live video now VERIFIED (HDMI connected):** capture works E2E —
+source sends 1080p (Dell EDID honored), ustreamer locks to 1920×1080 on-demand, the
+cockpit shows the live frame (MJPEG confirmed). Fixed DIY transport labels
+(C790/USB-dongle → H.264/fallback). Still pending hardware: HID input to a target
+(needs the USB gadget cable) + WebRTC negotiation in a real browser. See
 `TASK_TRACKER.md`.
 
 ---
