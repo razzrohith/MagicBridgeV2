@@ -566,7 +566,7 @@ body:not(.fs) .fs-hud{display:none!important}
 <!-- Main -->
 <div id="main">
   <div id="view">
-    <img id="stream" src="" alt="" onerror="onErr()" onload="onLoad()">
+    <img id="stream" src="" alt="" onerror="window.onErr&&onErr()" onload="window.onLoad&&onLoad()">
     <video id="webrtc-view" autoplay playsinline muted style="display:none;width:100%;height:100%;object-fit:contain;background:#000"></video>
     <div id="nosig">
       <svg class="nsico" width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1">
@@ -1207,7 +1207,7 @@ body:not(.fs) .fs-hud{display:none!important}
      /opt/magicbridge/web/static/vendor/; if that script hasn't run yet (or
      the C790 add-on isn't installed), these 404 harmlessly and startWebRTC()
      detects the missing Janus global and no-ops back to MJPEG. -->
-<script src="/static/vendor/adapter.js" defer></script>
+<script src="static/vendor/adapter.js" defer></script>
 <script type="module">try{const m=await import('/share/js/kvm/janus.js');window.Janus=m.Janus;}catch(e){console.warn('janus.js load failed',e);}</script>
 
 <script>
@@ -1222,7 +1222,9 @@ body:not(.fs) .fs-hud{display:none!important}
   const hex=n=>n!=null?('0x'+Number(n).toString(16)):null;
   window.fetch=function(url,opts){
     if(typeof url!=='string'||!url.startsWith('/api/')) return _F(url,opts);
-    if(KV.some(k=>url.startsWith(k))) return _F(url,opts);
+    // Boundary-aware passthrough: '/api/hid' must NOT swallow '/api/hid-autodisconnect'
+    // (a DIY pseudo-endpoint the shim stubs). Only match at a real path boundary.
+    if(KV.some(k=>{if(!url.startsWith(k))return false;const c=url.charAt(k.length);return c===''||c==='/'||c==='?';})) return _F(url,opts);
     return _shim(url,opts);
   };
   async function _shim(url,opts){
