@@ -33,7 +33,10 @@ mb_rw
 # ---- Hostname: realistic DESKTOP-XXXXXXX, generated once, then stable --------
 cur="$(hostname 2>/dev/null)"
 if [ "${MB_HOSTNAME_REALISTIC:-1}" = "1" ] && _is_tell "$cur"; then
-    suf="$(tr -dc 'A-Z0-9' </dev/urandom 2>/dev/null | head -c7)"
+    # `|| true`: head closing the pipe after 7 bytes SIGPIPEs tr (rc 141); this
+    # script has no `set -o pipefail` today, but the guard keeps it safe if one is
+    # ever added (and mirrors DIY d52ba3f, where exactly this aborted the install).
+    suf="$(tr -dc 'A-Z0-9' </dev/urandom 2>/dev/null | head -c7 || true)"
     newhost="DESKTOP-${suf:-7F3K9QZ}"; newhost="${newhost:0:15}"
     hostnamectl set-hostname "$newhost" 2>/dev/null
     printf '%s\n' "$newhost" > /etc/hostname 2>/dev/null

@@ -48,7 +48,7 @@ bash "$ROOT/provision/mb-anon-defaults.sh"
 # 4. realistic default monitor EDID identity (a real Dell), so the target never
 #    reads "MagicBridge"/"PiKVM"/a capture-card tell. Identity fields only.
 if command -v kvmd-edidconf >/dev/null 2>&1; then
-    ser=$(tr -dc A-Z </dev/urandom 2>/dev/null | head -c2)
+    ser=$(tr -dc A-Z </dev/urandom 2>/dev/null | head -c2 || true)  # || true: head SIGPIPEs tr, guard for set -o pipefail
     monser=$(printf 'CN%05d%s' $((RANDOM % 100000)) "${ser:-ZA}")
     echo "default EDID -> DELL P2419H / $monser"
     kvmd-edidconf --set-mfc-id DEL --set-monitor-name "DELL P2419H" \
