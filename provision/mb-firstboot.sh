@@ -2,23 +2,23 @@
 # ============================================================
 #  mb-firstboot.sh — MagicBridge first-boot finalize.
 #
-#  Runs ONCE on the first boot of a freshly-flashed card (guarded by a marker).
-#  A golden .img is generic; this makes each unit unique + clean, then hands off
-#  to WiFi onboarding:
+#  Runs ONCE on the first boot of a freshly-flashed card (marker-guarded). A
+#  golden .img is generic; this makes each unit unique + anonymous, then hands
+#  off to WiFi onboarding:
 #     1. OLED: "Please wait — first-time setup"
-#     2. fresh SSH host keys      (never ship shared keys in an image)
-#     3. fresh machine-id
-#     4. clear any onboarding/identity state baked into the image
-#        (saved WiFi, MAC-spoof .link files, net/stealth runtime config)
-#     5. re-apply branding (OLED name, theme)
+#     2. per-unit secret reset  (mb-secret-reset.sh: SSH/TLS keys, machine-id,
+#        auth->default, USB serial, cleared WiFi/Tailscale/identity state)
+#     3. realistic default MAC  (real vendor OUI, not the CM4 dc:a6:32 tell)
+#     4. realistic default EDID (a real Dell monitor, never a MagicBridge tell)
+#     5. re-apply branding
 #     6. mark done; mb-portal then raises the setup hotspot if there's no network
 #
-#  Filesystem auto-expand is handled by the image's own first-boot resize
-#  (pishrink / PiKVM), not here — see docs/IMAGING.md.
+#  Filesystem auto-expand is the image's own first-boot resize, not here.
 # ============================================================
 set +e
 
 MARKER="/var/lib/magicbridge/.mb-firstboot-done"   # removed by image-prep before snapshot
+ROOT="/opt/magicbridge"
 OLED="/usr/local/bin/mb-oled-msg"
 LOG="/run/mb-firstboot.log"
 exec >> "$LOG" 2>&1
@@ -29,40 +29,49 @@ echo "[$(date)] mb-firstboot starting"
 mb_rw(){ command rw 2>/dev/null || mount -o remount,rw / ; }
 mb_ro(){ command ro 2>/dev/null || mount -o remount,ro / ; }
 
-# 1) tell the user we're working
+# 1. tell the user we're working
 [ -x "$OLED" ] && "$OLED" "MagicBridge" "Please wait" "first-time setup" 2>/dev/null
+
+# 2. per-unit secrets (its own rw/ro handling)
+if [ -x "$ROOT/provision/mb-secret-reset.sh" ]; then
+    echo "running mb-secret-reset"
+    bash "$ROOT/provision/mb-secret-reset.sh"
+fi
 
 mb_rw
 
-# 2) fresh SSH host keys
-echo "regenerating SSH host keys"
-rm -f /etc/ssh/ssh_host_* 2>/dev/null
-ssh-keygen -A >/dev/null 2>&1
+# 3. realistic default MAC — the CM4's real OUI (dc:a6:32) is a "this is a Pi"
+#    network tell. Pick a real consumer-vendor OUI + random NIC portion, persisted
+#    via a systemd-networkd .link so udev applies it at boot BEFORE wlan0
+#    associates (no reconnect churn, no brick).
+OUIS=(a0:88:b4 3c:58:c2 34:41:5d e4:a4:71 f8:94:c2 48:2a:e3 d0:c6:37 c8:2b:96)
+oui=${OUIS[$((RANDOM % ${#OUIS[@]}))]}
+mac=$(printf '%s:%02x:%02x:%02x' "$oui" $((RANDOM%256)) $((RANDOM%256)) $((RANDOM%256)))
+echo "default MAC -> $mac"
+printf '[Match]\nOriginalName=wlan0\n\n[Link]\nMACAddressPolicy=none\nMACAddress=%s\n' "$mac" \
+    > /etc/systemd/network/70-mb-wlan0.link 2>/dev/null
 
-# 3) fresh machine-id
-echo "resetting machine-id"
-rm -f /etc/machine-id /var/lib/dbus/machine-id 2>/dev/null
-systemd-machine-id-setup >/dev/null 2>&1
-ln -sf /etc/machine-id /var/lib/dbus/machine-id 2>/dev/null
+# 4. realistic default monitor EDID identity (a real Dell), so the target never
+#    reads "MagicBridge"/"PiKVM"/a capture-card tell. Identity fields only.
+if command -v kvmd-edidconf >/dev/null 2>&1; then
+    ser=$(tr -dc A-Z </dev/urandom 2>/dev/null | head -c2)
+    monser=$(printf 'CN%05d%s' $((RANDOM % 100000)) "${ser:-ZA}")
+    echo "default EDID -> DELL P2419H / $monser"
+    kvmd-edidconf --set-mfc-id DEL --set-monitor-name "DELL P2419H" \
+        --set-product-id 16473 --set-serial $((RANDOM * RANDOM + 1)) \
+        --set-monitor-serial "$monser" --apply >/dev/null 2>&1
+fi
 
-# 4) clear onboarding / identity state that a golden image must not carry
-echo "clearing baked-in onboarding state"
-printf 'ctrl_interface=/run/wpa_supplicant\nupdate_config=1\ncountry=US\n' \
-    > /etc/wpa_supplicant/wpa_supplicant-wlan0.conf 2>/dev/null
-rm -f /etc/systemd/network/70-mb-*.link 2>/dev/null        # MAC-spoof persistence
-rm -f /var/lib/magicbridge/net.json /var/lib/magicbridge/stealth.json \
-      /var/lib/magicbridge/stealth_auth.json /var/lib/magicbridge/agent.json 2>/dev/null
-
-# 5) re-apply branding (OLED text, theme) from branding.env
+# 5. re-apply branding (OLED text, theme) from branding.env
 echo "applying branding"
-python3 /opt/magicbridge/branding/apply_branding.py --root /opt/magicbridge >/dev/null 2>&1
+python3 "$ROOT/branding/apply_branding.py" --root "$ROOT" >/dev/null 2>&1
 
-# 6) mark done
+# 6. mark done
 mkdir -p "$(dirname "$MARKER")" 2>/dev/null
 date > "$MARKER" 2>/dev/null
 
 mb_ro
 echo "[$(date)] mb-firstboot done — handing off to WiFi onboarding"
-# Do NOT --resume the OLED here: if there's no network, mb-portal will show the
-# "connect to hotspot" message next; if WiFi is already set, mb-portal resumes it.
+# Don't --resume the OLED here: mb-portal shows the "connect to hotspot" message
+# next if there's no network, or resumes the normal display if WiFi is already set.
 exit 0
