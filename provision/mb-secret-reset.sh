@@ -54,6 +54,16 @@ chown kvmd-vnc:   /etc/kvmd/vnc/ssl/server.key   /etc/kvmd/vnc/ssl/server.crt   
 # the per-unit override in the writable state dir so it falls back to that default.
 if command -v kvmd-htpasswd >/dev/null 2>&1; then
     info "resetting kvmd login to default magicbridge"
+    # kvmd-htpasswd edits an EXISTING file — if the store is missing (e.g. an image
+    # that stripped it) every add/set below fails silently and the unit ends up with
+    # NO web login. Reseed from PiKVM's own shipped default first, else an empty file.
+    if [ ! -f /etc/kvmd/htpasswd ]; then
+        info "htpasswd store missing — recreating it"
+        cp /usr/share/kvmd/configs.default/kvmd/htpasswd /etc/kvmd/htpasswd 2>/dev/null \
+            || : > /etc/kvmd/htpasswd
+        chown kvmd:kvmd /etc/kvmd/htpasswd 2>/dev/null
+        chmod 600 /etc/kvmd/htpasswd 2>/dev/null
+    fi
     # 'add' creates the user (fresh unit has only 'admin'); 'set' updates on re-run.
     printf 'magicbridge\n' | kvmd-htpasswd add -i magicbridge >/dev/null 2>&1 \
         || printf 'magicbridge\n' | kvmd-htpasswd set -i magicbridge >/dev/null 2>&1

@@ -129,6 +129,10 @@ if [[ "$MODE" == "verify" ]]; then
     chk "no avahi .mb-bak tells"      '! ls "$R"/etc/avahi/services/*.mb-bak >/dev/null 2>&1'
     chk "defaults KEPT (kvmd.json)"   '[[ -f "$R/etc/magicbridge/kvmd.json" ]]'
     chk "defaults KEPT (stealth_auth)" '[[ -f "$R/etc/magicbridge/stealth_auth.json" ]]'
+    # htpasswd must SURVIVE: kvmd-htpasswd edits an existing file, so a missing one
+    # can leave the flashed unit with no web login. Must also not carry stock 'admin'.
+    chk "htpasswd KEPT (unit stays loginable)" '[[ -s "$R/etc/kvmd/htpasswd" ]]'
+    chk "htpasswd has no stock admin user"     '! cut -d: -f1 "$R/etc/kvmd/htpasswd" 2>/dev/null | grep -qx admin'
     if [[ -n "$MSDPART" ]]; then
         mount "$MSDPART" "$MNT/msd" 2>/dev/null || true
         chk "MSD has no uploaded images" '[[ -z "$(find "$MNT/msd" -maxdepth 1 -type f ! -name ".*" 2>/dev/null)" ]]'
@@ -149,9 +153,17 @@ rm -f "$R"/etc/ssh/ssh_host_* 2>/dev/null || true
 rm -f "$R/var/lib/dbus/machine-id" 2>/dev/null || true
 : > "$R/etc/machine-id"
 
-# 2. kvmd credentials. htpasswd/ipmipasswd/vncpasswd are re-seeded to the
-#    MagicBridge defaults by mb-secret-reset on first boot; ship nothing stock.
-rm -f "$R/etc/kvmd/htpasswd" "$R/etc/kvmd/ipmipasswd" "$R/etc/kvmd/vncpasswd" 2>/dev/null || true
+# 2. kvmd credentials. ipmipasswd/vncpasswd are safe to delete: mb-secret-reset
+#    rewrites them with `printf >`, which creates the file.
+#    htpasswd is DELIBERATELY KEPT. mb-secret-reset re-seeds it via
+#    `kvmd-htpasswd add -i`, and that tool operates on an EXISTING file - delete it
+#    and a flashed unit can end up with no web login at all. Keeping it is also
+#    anonymity-neutral: it holds only the documented default user (magicbridge), and
+#    a value identical on every unit cannot cross-link units (that needs a UNIQUE
+#    value). Same rationale as kvmd.json / stealth_auth.json below. First boot
+#    normalizes it back to the default anyway, so a custom builder password
+#    does not survive into flashed units.
+rm -f "$R/etc/kvmd/ipmipasswd" "$R/etc/kvmd/vncpasswd" 2>/dev/null || true
 : > "$R/etc/kvmd/totp.secret" 2>/dev/null || true
 
 # 3. kvmd TLS — stock certs are IDENTICAL across every install of an OS build,
