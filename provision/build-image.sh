@@ -35,6 +35,7 @@ die(){  echo -e "${RED}✗${NC} $*"; exit 1; }
 
 MODE="arm"
 if [[ "${1:-}" == "--verify" ]]; then MODE="verify"; shift; fi
+if [[ "${1:-}" == "--shrink" ]]; then MODE="shrink"; shift; fi
 IMG="${1:-}"
 [[ $EUID -eq 0 ]] || die "Run as root (needs loop mount)."
 [[ -f "$IMG" ]]   || die "Usage: $0 <base.img> [out.img]   |   $0 --verify <img>"
@@ -51,6 +52,8 @@ if [[ "$MODE" == "arm" ]]; then
 else
     OUT="$IMG"
 fi
+
+if [[ "$MODE" == "shrink" ]]; then OUT="$IMG"; fi
 
 MNT=$(mktemp -d); LOOP=""
 cleanup(){
@@ -101,6 +104,49 @@ for p in "${LOOP}"p*; do
     fi
 done
 ok "No LUKS container (expected for PiKVM)"
+
+# =========================================================================
+#  SHRINK MODE — shrink the (empty, last) MSD partition and truncate the file
+#  so the .img flashes onto any reasonably sized card. mb-expand-msd.sh grows
+#  it back to the real card size on first boot.
+# =========================================================================
+if [[ "$MODE" == "shrink" ]]; then
+    [[ -n "$MSDPART" ]] || die "no PIMSD partition to shrink"
+    PNUM="${MSDPART##*p}"
+    # SAFETY: only shrink if MSD really is the last partition on the disk.
+    # (sysfs, not partx: `-nr` glues into one option and misparses the range.)
+    msd_start=$(cat "/sys/class/block/$(basename "$MSDPART")/start")
+    for p in "${LOOP}"p*; do
+        [[ -e "$p" ]] || continue
+        s=$(cat "/sys/class/block/$(basename "$p")/start" 2>/dev/null || echo 0)
+        [[ "$s" -gt "$msd_start" ]] && die "PIMSD is not the last partition - refusing to shrink"
+    done
+    info "Shrinking MSD ($MSDPART) ..."
+    e2fsck -f -p "$MSDPART" >/dev/null 2>&1 || true
+    resize2fs -M "$MSDPART" >/dev/null 2>&1 || die "resize2fs -M failed"
+    BC=$(dumpe2fs -h "$MSDPART" 2>/dev/null | awk -F: '/Block count/{gsub(/ /,"",$2);print $2}')
+    BS=$(dumpe2fs -h "$MSDPART" 2>/dev/null | awk -F: '/Block size/{gsub(/ /,"",$2);print $2}')
+    [[ -n "$BC" && -n "$BS" ]] || die "could not read MSD filesystem geometry"
+    # keep a little slack so ext4 isn't pinned at its absolute minimum
+    NEWBYTES=$(( BC * BS + 32*1024*1024 ))
+    NEWSECT=$(( (NEWBYTES + 511) / 512 ))
+    NEWEND=$(( msd_start + NEWSECT - 1 ))
+    info "MSD fs = $((BC*BS/1024/1024)) MiB -> partition end sector $NEWEND"
+    # sfdisk, not parted: parted refuses its "shrinking can cause data loss"
+    # prompt even under -s, so resizepart always returns 1 here.
+    echo ",${NEWSECT}" | sfdisk -N "$PNUM" --force --no-reread --no-tell-kernel "$LOOP" >/dev/null 2>&1 \
+        || die "sfdisk resize of partition $PNUM failed"
+    partprobe "$LOOP" 2>/dev/null || partx -u "$LOOP" 2>/dev/null; sleep 1
+    resize2fs "$MSDPART" >/dev/null 2>&1 || true   # fill the slack
+    sync
+    losetup -d "$LOOP"; LOOP=""; trap - EXIT; rm -rf "$MNT"
+    NEWSIZE=$(( (NEWEND + 1) * 512 ))
+    truncate -s "$NEWSIZE" "$IMG"
+    ok "Image truncated to $(( NEWSIZE/1024/1024 )) MiB ($IMG)"
+    echo "  MSD grows back to the full card on first boot (mb-expand-msd.sh)."
+    echo "  Next: $0 --verify $IMG   then compress:  xz -T0 -v $IMG"
+    exit 0
+fi
 
 mount "$ROOTPART" "$MNT/root"
 R="$MNT/root"

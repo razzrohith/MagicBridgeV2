@@ -56,6 +56,15 @@ if command -v kvmd-edidconf >/dev/null 2>&1; then
         --set-monitor-serial "$monser" --apply >/dev/null 2>&1
 fi
 
+# 4b. grow the virtual-media (MSD) partition to fill THIS card. A distributable
+#     image ships it shrunk (that is what keeps the .img small enough to flash on
+#     any card); this restores full capacity per unit. No-ops on a non-shrunk unit,
+#     and every failure path is benign (worst case: a smaller MSD).
+if [ -x "$ROOT/provision/mb-expand-msd.sh" ] || [ -f "$ROOT/provision/mb-expand-msd.sh" ]; then
+    echo "expanding MSD partition"
+    bash "$ROOT/provision/mb-expand-msd.sh"
+fi
+
 # 5. re-apply branding (OLED text, theme) from branding.env
 echo "applying branding"
 python3 "$ROOT/branding/apply_branding.py" --root "$ROOT" >/dev/null 2>&1
