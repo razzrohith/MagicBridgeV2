@@ -71,7 +71,9 @@ if [ -f "$AV" ] && grep -qiE '_pikvm|PiKVM|Compute Module|board=rpi' "$AV" 2>/de
     cat > "$AV" <<'XML'
 <?xml version="1.0" standalone='no'?>
 <!DOCTYPE service-group SYSTEM "avahi-service.dtd">
-<!-- Neutralized by MagicBridge: kvmd's _pikvm._tcp advert leaked PiKVM/RPi/serial tells over mDNS. -->
+<!-- Emptied by MagicBridge: the stock mDNS advert here announced the product
+     name, board, model and serial over the LAN. Nothing product-identifying is
+     broadcast now; the realistic host.local still resolves. -->
 <service-group>
   <name replace-wildcards="yes">%h</name>
 </service-group>
