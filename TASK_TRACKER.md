@@ -125,8 +125,12 @@
   remounts and exits 0 (worst case: a smaller MSD — root is a different partition).
   **Untested on hardware** until the first flash.
 - Final: 19/19 `--verify` pass after shrink; partition table p1 256M / p2 256M /
-  p3 6G / p4 224.6M. `.img.xz` produced for storage/sharing (Imager flashes it
-  natively). `pishrink` was NOT needed and remains unused.
+  p3 6G / p4 224.6M. Compressed to **`magicbridge-pikvm-dist.img.xz` = 579 MB**
+  (51x smaller than the 29.72 GB original; `xz -t` verified intact). Imager flashes
+  `.img.xz` natively. `pishrink` was NOT needed and remains unused.
+- ⏳ **Untested on hardware:** `mb-expand-msd.sh` has never run on a real unit. Check
+  MSD size on the first flashed card; if it did not grow, the unit still works fine
+  (root is a separate partition) and only virtual-media capacity is affected.
 
 ---
 
