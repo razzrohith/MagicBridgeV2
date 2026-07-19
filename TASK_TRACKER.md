@@ -8,21 +8,30 @@
 > record each fix with its commit hash. If you're an AI assistant, keeping this current is part
 > of every task — not optional.
 
-**Last updated:** 2026-07-18
-**Repo HEAD:** `e395b5d` · github.com/razzrohith/magicbridge-pikvm
-**Device:** OFFLINE (powered off). All recent work is committed + pushed, pending an
-`align_pi.py` deploy + on-device verification when the device is back on.
+**Last updated:** 2026-07-19
+**Repo HEAD:** `123002b` · github.com/razzrohith/magicbridge-pikvm
+**Device:** ONLINE @ `172.16.20.209`, hostname now `DESKTOP-LGA3O5H` (realistic).
+Last session's offline work is now deployed + verified on-device.
 **How to update this file:** see the "Maintenance protocol" at the bottom.
 
-### ⏳ Pending device-online verification (DIY→PiKVM port, done offline)
-All coded, syntax-checked, and (for UI) headless-render-verified; needs the powered
-device to confirm live behaviour. Deploy with `align_pi.py` (in-tree) + note the
-out-of-tree pieces it flags (nginx, login page, systemd units → SFTP / re-run installer):
-- **nginx `access_log off`** (privacy) → SFTP `magicbridge.conf` + reload kvmd-nginx.
-- **first-boot defaults** (realistic MAC OUI, Dell EDID, secret-reset) → only runs on a
-  freshly-flashed image; confirm on the next image build. Current unit is untouched (marker set).
-- **cockpit re-base** (DIY latest UI + graft) → confirm live data + video/input once HDMI/USB connected.
-- **align_pi incremental / --check doctor / OLED "Updating"** → run once on-device.
+### 🔒 Anonymity hardening — handoff items 4, 5, 5b, 5c (verified on-device 2026-07-19)
+- **Realistic hostname (#5b):** `magicbridge` → per-unit `DESKTOP-XXXXXXX` (stable,
+  idempotent). Branded mDNS aliases (`magicbridge.local`/`kvm.local`) OFF by default.
+- **kvmd `_pikvm._tcp` mDNS advert neutralized (#5b):** it broadcast "PiKVM Web Server /
+  Raspberry Pi Compute Module 4 / board=rpi4 / serial" to any mDNS scan — emptied.
+- **Realistic MAC default (#4):** networkd `.link` with a real vendor OUI (the kvmd-correct
+  equivalent of DIY's NM `cloned-mac-address`; `ip link set` reverts, this sticks).
+  ⏳ **applies on the next reboot** (I did not reboot the live unit unsupervised — a MAC
+  change moves the DHCP IP).
+- **No re-brand (#5c):** installer stopped force-setting `magicbridge`; the idempotent
+  `mb-anon-defaults.sh` keeps realistic values and never re-randomizes.
+- **Defaults verified realistic (#5):** USB Logitech `046d:c52b`, EDID `DELL P2419H`,
+  MAC realistic, all survive `mb-secret-reset` on a clone.
+- Mechanism: `mb-anon-defaults.sh` + `mb-anon-defaults.service` (boot, idempotent) +
+  installer + first-boot + secret-reset. Opt-out: `MB_MAC_AUTOSPOOF`/`MB_HOSTNAME_REALISTIC`.
+
+⏳ Remaining device confirms: MAC/hostname across a real reboot; live video/input once HDMI+USB
+are connected; a full clean-flash image build.
 
 ---
 
