@@ -1,0 +1,34 @@
+#!/usr/bin/env bash
+# ============================================================
+#  mb-oled-msg — show a custom message on the PiKVM OLED.
+#
+#  Takes the OLED over from the kvmd-oled status daemon so we can display
+#  first-boot / WiFi-onboarding messages, then hands it back when done.
+#  kvmd-oled --text draws once and exits; the SSD1306 holds the frame until
+#  something redraws, so the message stays until we --resume (or reboot).
+#
+#    mb-oled-msg "Line 1" "Line 2" ...   show a message (pauses kvmd-oled)
+#    mb-oled-msg --resume                give the OLED back to kvmd-oled
+# ============================================================
+set +e
+
+if [ "$1" = "--resume" ]; then
+    systemctl start kvmd-oled 2>/dev/null
+    exit 0
+fi
+
+# Take over the display: stop the rotating status daemon first.
+systemctl stop kvmd-oled 2>/dev/null
+sleep 0.2
+
+# Join args with real newlines (kvmd-oled renders each line).
+msg=""
+for line in "$@"; do
+    if [ -z "$msg" ]; then msg="$line"; else msg="$msg"$'\n'"$line"; fi
+done
+[ -z "$msg" ] && msg="MagicBridge"
+
+# Draw it (larger font, centred-ish). Falls back to a plain draw if flags differ.
+kvmd-oled --text "$msg" --font-size 13 >/dev/null 2>&1 \
+    || kvmd-oled --text "$msg" >/dev/null 2>&1
+exit 0

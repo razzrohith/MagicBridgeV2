@@ -24,6 +24,7 @@ PORTAL="/opt/magicbridge/provision/portal.py"
 WIFI_FILE="/tmp/mb-provision-wifi"
 TS_KEY="/tmp/mb-provision-tskey"
 WPA_CONF="/etc/wpa_supplicant/wpa_supplicant-${AP_IFACE}.conf"
+OLED="/usr/local/bin/mb-oled-msg"
 exec >> "$LOG" 2>&1
 echo "[$(date)] mb-portal starting"
 
@@ -108,7 +109,7 @@ save_wifi(){
 # On boot, give any saved WiFi ~40s to associate + get DHCP before deciding to AP.
 for i in $(seq 1 8); do
     sleep 5
-    if online; then echo "[$(date)] network is up — nothing to do"; exit 0; fi
+    if online; then echo "[$(date)] network is up — nothing to do"; [ -x "$OLED" ] && "$OLED" --resume; exit 0; fi
 done
 
 # No network -> provisioning. Keep the hotspot up until someone submits creds;
@@ -116,6 +117,7 @@ done
 # has no network => hotspot returns, so this effectively retries until connected.
 while true; do
     setup_ap
+    [ -x "$OLED" ] && "$OLED" "WiFi setup needed" "Join hotspot:" "$AP_SSID"
     echo "[$(date)] waiting for credentials (no timeout) ..."
     rm -f "$WIFI_FILE" "$TS_KEY"
     python3 "$PORTAL" "$AP_IP" "$PORT" "$WIFI_FILE" "$TS_KEY"   # blocks until submit

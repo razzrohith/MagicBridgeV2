@@ -124,6 +124,7 @@ phase3_rebrand() {
   # hostname + mDNS
   run "hostnamectl set-hostname '${MB_HOSTNAME}' || true"
   run "install -Dm755 '$INSTALL_ROOT/branding/mb-mdns-alias.sh' /usr/local/bin/mb-mdns-alias.sh"
+  run "install -Dm755 '$INSTALL_ROOT/provision/mb-oled-msg' /usr/local/bin/mb-oled-msg"
   run "install -Dm644 '$INSTALL_ROOT/systemd/mb-mdns-alias.service' /etc/systemd/system/mb-mdns-alias.service"
   # OLED splash + web UI branding are applied by the branding applier
   run "python3 '$INSTALL_ROOT/branding/apply_branding.py' --root '$INSTALL_ROOT'"
@@ -198,6 +199,13 @@ phase6_enable() {
   run "chmod +x '$INSTALL_ROOT/provision/mb-portal.sh' 2>/dev/null || true"
   run "pacman -Sy --noconfirm --needed hostapd dnsmasq 2>/dev/null || true"
   [ -f /etc/systemd/system/mb-portal.service ] && run "systemctl enable mb-portal.service 2>/dev/null || true"
+  # First-boot finalize (OLED "please wait" → unique keys/id → clean state → WiFi
+  # onboarding). Enable it, but drop the "done" marker NOW so a DIRECT install
+  # never wipes this device on next boot. The image-prep step (docs/IMAGING.md)
+  # removes the marker so ONLY a freshly-flashed golden image runs first-boot.
+  run "chmod +x '$INSTALL_ROOT/provision/mb-firstboot.sh' 2>/dev/null || true"
+  [ -f /etc/systemd/system/mb-firstboot.service ] && run "systemctl enable mb-firstboot.service 2>/dev/null || true"
+  run "mkdir -p /var/lib/magicbridge && touch /var/lib/magicbridge/.mb-firstboot-done"
   run "systemctl try-restart kvmd || true"
   run "systemctl restart kvmd-oled 2>/dev/null || true"
   ok "MagicBridge enabled"

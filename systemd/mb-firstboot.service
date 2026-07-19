@@ -1,0 +1,19 @@
+[Unit]
+Description=MagicBridge first-boot finalize (unique keys, clean state, branding)
+DefaultDependencies=no
+After=local-fs.target systemd-machine-id-commit.service
+Wants=local-fs.target
+# Run our finalize (and its OLED "please wait") before the OLED daemon and the
+# WiFi captive portal so the display + onboarding order is correct.
+Before=mb-portal.service kvmd-oled.service network-pre.target sysinit.target
+# Skip entirely once finalized (marker written on first run).
+ConditionPathExists=!/var/lib/magicbridge/.mb-firstboot-done
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/bin/bash /opt/magicbridge/provision/mb-firstboot.sh
+TimeoutStartSec=180
+
+[Install]
+WantedBy=sysinit.target
