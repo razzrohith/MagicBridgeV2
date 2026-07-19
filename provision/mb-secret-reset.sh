@@ -56,6 +56,26 @@ printf '{\n  "user": "magicbridge",\n  "passwd": "magicbridge",\n  "base": "http
     > /etc/magicbridge/kvmd.json 2>/dev/null
 chmod 600 /etc/magicbridge/kvmd.json 2>/dev/null
 : > /etc/kvmd/totp.secret 2>/dev/null
+
+# 4b. kvmd's OTHER credential stores: ipmipasswd + vncpasswd. Both services ship
+#     DISABLED, but the files still hold PiKVM's stock "admin" credential — a
+#     factory tell, and one every unit flashed from a golden image would share.
+#     Normalize to the MagicBridge default so nothing stock-PiKVM ships. Keep the
+#     kvmd-owned modes; these files are 0600 and owned by their service users.
+if [ -f /etc/kvmd/ipmipasswd ]; then
+    info "resetting kvmd IPMI credential (stock 'admin' is a PiKVM tell)"
+    printf '# IPMI users in format "login:password", one per line. NOT encrypted.\nmagicbridge:magicbridge\n' \
+        > /etc/kvmd/ipmipasswd 2>/dev/null
+    chown kvmd-ipmi:kvmd-ipmi /etc/kvmd/ipmipasswd 2>/dev/null
+    chmod 600 /etc/kvmd/ipmipasswd 2>/dev/null
+fi
+if [ -f /etc/kvmd/vncpasswd ]; then
+    info "resetting kvmd VNC credential (stock 'admin' is a PiKVM tell)"
+    printf '# Passwords for the legacy VNCAuth, one per line. NOT encrypted.\nmagicbridge\n' \
+        > /etc/kvmd/vncpasswd 2>/dev/null
+    chown kvmd-vnc:kvmd-vnc /etc/kvmd/vncpasswd 2>/dev/null
+    chmod 600 /etc/kvmd/vncpasswd 2>/dev/null
+fi
 rm -f /var/lib/magicbridge/net.json /var/lib/magicbridge/stealth.json \
       /var/lib/magicbridge/stealth_auth.json /var/lib/magicbridge/agent.json 2>/dev/null
 
