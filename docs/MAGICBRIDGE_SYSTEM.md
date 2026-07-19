@@ -228,8 +228,18 @@ targets). HID gadget works. OLED works. All services healthy. **Open:** partial
 frames (retest on wall power), I2S audio (upstream bug — parked), Janus/WebRTC
 integration (the low-latency payoff — next big task).
 
-**PiKVM:** Rebrand code committed; **deploy to Pi 209 pending device online**.
-Feature port largely done (UI, stealth, WiFi, WebRTC); see its trackers.
+**PiKVM:** Live and rebranded. Cockpit is a port of the **DIY UI** onto kvmd (DIY
+JSON `/ws` bridged to kvmd binary `/api/ws`, MJPEG via kvmd streamer, WebRTC via
+kvmd's own `janus.js`, and an `/api/*`→kvmd+`/mb/*` fetch shim). Product = two web
+faces only: the regular cockpit (`/mb/ui/`) and the hidden stealth panel
+(`/stealth/`); native kvmd pages redirect to the cockpit. The **DIY→PiKVM handoff**
+(`docs/PIKVM_PORT_HANDOFF.md`) is ported: anonymity (nginx access-log off, per-unit
+secret reset, realistic default MAC-OUI + Dell EDID at first-boot), update tooling
+(incremental `align_pi.py`, installer `--check`, OLED "Updating…"), and UI
+(Software-Update category, "how the target sees it" identity card, copy cleanup).
+Skipped what kvmd already provides (Janus/WebRTC, absolute-mouse HID descriptor).
+Last big batch was done with the device OFFLINE — committed + pushed, pending an
+`align_pi.py` deploy + on-device verification. See `TASK_TRACKER.md`.
 
 ---
 

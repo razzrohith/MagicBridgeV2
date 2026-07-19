@@ -9,9 +9,20 @@
 > of every task — not optional.
 
 **Last updated:** 2026-07-18
-**Repo HEAD:** `75f4a92` · github.com/razzrohith/magicbridge-pikvm
-**Device:** online, fully functional @ `172.16.20.209`. Pi IP changes per location.
+**Repo HEAD:** `e395b5d` · github.com/razzrohith/magicbridge-pikvm
+**Device:** OFFLINE (powered off). All recent work is committed + pushed, pending an
+`align_pi.py` deploy + on-device verification when the device is back on.
 **How to update this file:** see the "Maintenance protocol" at the bottom.
+
+### ⏳ Pending device-online verification (DIY→PiKVM port, done offline)
+All coded, syntax-checked, and (for UI) headless-render-verified; needs the powered
+device to confirm live behaviour. Deploy with `align_pi.py` (in-tree) + note the
+out-of-tree pieces it flags (nginx, login page, systemd units → SFTP / re-run installer):
+- **nginx `access_log off`** (privacy) → SFTP `magicbridge.conf` + reload kvmd-nginx.
+- **first-boot defaults** (realistic MAC OUI, Dell EDID, secret-reset) → only runs on a
+  freshly-flashed image; confirm on the next image build. Current unit is untouched (marker set).
+- **cockpit re-base** (DIY latest UI + graft) → confirm live data + video/input once HDMI/USB connected.
+- **align_pi incremental / --check doctor / OLED "Updating"** → run once on-device.
 
 ---
 
@@ -73,6 +84,7 @@
 
 | Date | Commit | What |
 |------|--------|------|
+| 2026-07-18 | `e395b5d` | **DIY→PiKVM port (docs/PIKVM_PORT_HANDOFF.md), done offline:** anonymity — nginx access-log off (#1,#2), per-unit `mb-secret-reset.sh` + realistic default MAC-OUI + Dell EDID at first-boot (#3,#4,#5,#20), rfkill in portal (#6). Update tooling — incremental `align_pi.py` + git safe.directory (#22,#23), installer `--check` doctor (#21), OLED "Updating…" during self-update (#19). UI — cockpit re-based on DIY's latest (Software-Update category #16, "How the target sees it" identity card #14, connected-viewers, em-dash cleanup #17). Skipped #8 (kvmd native WebRTC) and #9-descriptor (kvmd native absolute mouse). #10/#11/#13/#15 already landed with the DIY-UI port. |
 | 2026-07-18 | `a577926` | **UI overhaul — pro cyan-HUD redesign across all pages (login/cockpit/stealth):** new MagicBridge robot-face logo everywhere; gradient-mesh + HUD-grid backdrop, glass cards w/ hover-lift, animated nav, gradient wordmark, glowing LEDs, fluid transitions. **Esc = hold-to-exit** capture (single tap → target, hold ~2.5s or Right-Ctrl → release) w/ fullscreen + Keyboard Lock, release bar, recapture overlay, predictive cursor. **2FA field removed** from login. Skipped DIY-only bits (WoL, target-audio, OLED-settings, HID-autodisconnect, C790); kept our extras (VNC, EDID, clients, peers, LED, logs, DuckDNS, MAC). kvmd/sidecar wiring reused verbatim. ⚠️ Not yet runtime-tested in a browser (cert/origin approval needed) — verified via node --check + full authenticated render. |
 | 2026-07-18 | `75f4a92` | **Bug-audit sweep — 6 verified bugs fixed & tested on-device:** MAC spoof now persists across reboot (systemd-networkd `.link`, + validation + `clear`); DuckDNS no longer marks enabled on `KO`; net `_ro()` real remount fallback; wifi/scan uses `await asyncio.sleep` (was blocking the event loop); stealth safe-mode returns an honest note; **AI-agent `key` steps now fire for real** via kvmd `send_key`/`send_shortcut` (+ key normalizer). Agent stays flag-disabled. |
 | 2026-07-18 | `98bf77a` | Rebrand `MagicBridgeV2`→`MagicBridge` deployed to Pi 209 (`align_pi.py`); OLED override re-stamped to `MagicBridge` + `kvmd-oled` restarted |
