@@ -95,9 +95,26 @@
   `fs.protected_regular=1` → bug class N/A; our installer also already refuses to run
   `nginx -t` (gates on `systemctl restart kvmd-nginx`). (b) SIGPIPE guards done
   earlier (`c302a7b`).
-- ⏳ Needs the physical card: read golden SD → `.img`, arm it, flash a 2nd card, then
-  prove uniqueness (hostname / MAC / SSH host key / machine-id all differ). `pishrink`
-  auto-expand on Arch + read-only root is **unvalidated** — fallback is `xz` + `.img.xz`.
+- **REAL IMAGE BUILT (2026-07-19).** Golden card read to
+  `E:\Startup\flashOS_PIKVM\magicbridge-pikvm-base.img` (29.72 GB, byte-exact vs the
+  card) → armed to `magicbridge-pikvm-dist.img`. Root correctly detected as **p3**,
+  no LUKS, MSD emptied (the golden unit's 169 MB ISO gone), PST clean. **All 19
+  `--verify` checks pass.** Independent audit also confirmed: hostname reset to the
+  `magicbridge` placeholder tell (so anon-defaults regenerates), no residual old
+  machine-id or old MAC anywhere, no bash history, `/var/log` empty.
+- **Bug the real run exposed** (`a844911`) — caught by an independent audit, NOT by
+  the script's own assertions: arming deleted `/etc/kvmd/htpasswd`, but
+  `kvmd-htpasswd add -i` edits an EXISTING store, so first boot would have left the
+  unit with **no web login**. htpasswd is now KEPT (anonymity-neutral — an identical
+  value on every unit cannot cross-link them), and secret-reset recreates it from
+  PiKVM's shipped default if absent. ipmipasswd/vncpasswd/TLS were never at risk
+  (those are recreated with `printf >` / `openssl`).
+- ⏳ Next: flash a 2nd card from `dist.img`, confirm the OLED→hotspot→WiFi flow, then
+  prove uniqueness (hostname / MAC / SSH host key / machine-id all differ from golden).
+- ⚠ **Before distributing to anyone else:** zero the free space — deleting the ISO did
+  not erase its blocks, so remnants are still recoverable from the raw image (also
+  what makes it compress from 30 GB to ~a few hundred MB). Fine as-is for flashing
+  our own cards. `pishrink` auto-expand on Arch + read-only root remains unvalidated.
 
 ---
 

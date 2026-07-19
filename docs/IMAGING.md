@@ -139,11 +139,33 @@ The GitHub-connected self-update already exists: cockpit **System → Apply upda
 `/opt/magicbridge` + restart services), or `magic-install.sh --update`. Out-of-tree
 files (the login page) refresh via `--update`, not the in-UI button.
 
+## ⚠ Before giving the image to someone ELSE: zero the free space
+`build-image.sh` deletes the golden unit's files, but deleting does **not** erase the
+underlying blocks — the raw image still contains recoverable remnants (e.g. the ISO
+that was on the MSD partition). Fine for flashing your own cards; **not** fine for
+distribution. Zero the free space first, which also makes the image compress from
+~30 GB to a few hundred MB:
+```
+# per ext4 partition (root p3 and msd p4), with the partition mounted:
+dd if=/dev/zero of=<mnt>/zero.fill bs=4M status=progress || true; sync; rm -f <mnt>/zero.fill
+# then compress - Raspberry Pi Imager flashes .img.xz natively:
+xz -T0 -v magicbridge-pikvm-dist.img
+```
+(`zerofree` on the *unmounted* fs does the same job if installed.)
+
 ## Status (2026-07-19)
-- `build-image.sh`: **built + tested** against a synthetic 4-partition PiKVM-layout
-  image — arming passes all 17 `--verify` assertions, and `--verify` correctly
-  **fails 14** of them on an unarmed image (exit 1), so the verifier genuinely
-  discriminates. Not yet run on a real card image.
+- `build-image.sh`: **built + run on a REAL card image.** A 29.72 GB read of the
+  golden V4 Mini card armed cleanly (root correctly detected as **p3**, no LUKS, MSD
+  emptied, PST clean) and passes **all 19** `--verify` assertions; `--verify`
+  correctly **fails 14** of them on an unarmed image (exit 1), so the verifier
+  genuinely discriminates rather than rubber-stamping.
+- **A real bug the first armed image exposed** (found by an independent audit, not by
+  the script's own assertions): arming deleted `/etc/kvmd/htpasswd`. `mb-secret-reset`
+  re-seeds the login with `kvmd-htpasswd add -i`, which edits an **existing** store —
+  with the file gone, the flashed unit would have had **no web login**. htpasswd is
+  now deliberately KEPT (anonymity-neutral: it holds only the documented default
+  user, and a value identical on every unit cannot cross-link units), and
+  `mb-secret-reset` recreates it from PiKVM's shipped default if ever missing.
 - **Fixed while building this** (both would have broken a flashed unit):
   1. `mb-firstboot.service` existed in the git tree but had **never been installed**
      to `/etc/systemd/system` on the golden unit — a flashed card would have skipped
