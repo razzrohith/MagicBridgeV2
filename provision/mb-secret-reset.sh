@@ -47,8 +47,9 @@ done
 # the per-unit override in the writable state dir so it falls back to that default.
 if command -v kvmd-htpasswd >/dev/null 2>&1; then
     info "resetting kvmd login to default magicbridge"
-    printf 'magicbridge\nmagicbridge\n' | kvmd-htpasswd set magicbridge >/dev/null 2>&1 \
-        || echo magicbridge | kvmd-htpasswd set magicbridge >/dev/null 2>&1
+    # 'add' creates the user (fresh unit has only 'admin'); 'set' updates on re-run.
+    printf 'magicbridge\n' | kvmd-htpasswd add -i magicbridge >/dev/null 2>&1 \
+        || printf 'magicbridge\n' | kvmd-htpasswd set -i magicbridge >/dev/null 2>&1
     kvmd-htpasswd del admin >/dev/null 2>&1 || true
 fi
 printf '{\n  "user": "magicbridge",\n  "passwd": "magicbridge",\n  "base": "https://127.0.0.1/api"\n}\n' \

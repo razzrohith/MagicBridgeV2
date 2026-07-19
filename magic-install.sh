@@ -142,8 +142,10 @@ phase3_rebrand() {
   # operator only types the password. Kept in sync with /etc/magicbridge/kvmd.json
   # (Phase 4) which the sidecars use to call kvmd's API.
   if [ "$DRY_RUN" = 0 ] && command -v kvmd-htpasswd >/dev/null 2>&1; then
-    printf 'magicbridge\nmagicbridge\n' | kvmd-htpasswd set magicbridge >/dev/null 2>&1 \
-      || echo magicbridge | kvmd-htpasswd set magicbridge >/dev/null 2>&1
+    # 'add' creates a new user, 'set' updates an existing one — try add first so a
+    # fresh unit (only 'admin' exists) works, fall back to set on a re-run.
+    printf 'magicbridge\n' | kvmd-htpasswd add -i magicbridge >/dev/null 2>&1 \
+      || printf 'magicbridge\n' | kvmd-htpasswd set -i magicbridge >/dev/null 2>&1
     kvmd-htpasswd del admin >/dev/null 2>&1 || true
   fi
   # MOTD / SSH banner
