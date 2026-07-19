@@ -66,15 +66,23 @@ if ! echo ",${newsize}" | sfdisk -N "$PARTNUM" --force --no-reread --no-tell-ker
         exit 0
     fi
 fi
+# Make the kernel actually re-read the enlarged partition before resize2fs, else
+# resize2fs sees the OLD size. udevadm settle is the reliable part; partprobe/partx
+# are best-effort nudges. (The stale-table race is what wedged the first flashed
+# unit; PIMSD is now `nofail` so even a failure here can no longer block boot.)
 partprobe "$DISK" 2>/dev/null || partx -u "$DISK" 2>/dev/null
+udevadm settle --timeout=10 2>/dev/null
 sleep 1
 
+# Always leave the filesystem CLEAN, whatever happens, so the boot-time mount
+# (nofail, errors=remount-ro) never trips on a dirty/half-resized fs.
 e2fsck -f -p "$MSDDEV" >/dev/null 2>&1
 if resize2fs "$MSDDEV" >/dev/null 2>&1; then
     log "MSD grown to $(blockdev --getsize64 "$MSDDEV" 2>/dev/null) bytes"
 else
-    log "resize2fs failed - MSD stays at its current size"
+    log "resize2fs failed - MSD stays at its current size (boot is safe: nofail)"
 fi
+e2fsck -f -p "$MSDDEV" >/dev/null 2>&1   # re-clean after the resize attempt
 
 mount "$MP" 2>/dev/null
 exit 0

@@ -179,6 +179,8 @@ if [[ "$MODE" == "verify" ]]; then
     # can leave the flashed unit with no web login. Must also not carry stock 'admin'.
     chk "htpasswd KEPT (unit stays loginable)" '[[ -s "$R/etc/kvmd/htpasswd" ]]'
     chk "htpasswd has no stock admin user"     '! cut -d: -f1 "$R/etc/kvmd/htpasswd" 2>/dev/null | grep -qx admin'
+    chk "PIMSD mount is nofail (cannot block boot)" 'grep -qE "LABEL=PIMSD.*nofail" "$R/etc/fstab"'
+    chk "PIPST mount is nofail (cannot block boot)" 'grep -qE "LABEL=PIPST.*nofail" "$R/etc/fstab"'
     if [[ -n "$MSDPART" ]]; then
         mount "$MSDPART" "$MNT/msd" 2>/dev/null || true
         chk "MSD has no uploaded images" '[[ -z "$(find "$MNT/msd" -maxdepth 1 -type f ! -name ".*" 2>/dev/null)" ]]'
@@ -265,6 +267,31 @@ else
     warn "mb-portal.service missing - a flashed unit will have no WiFi onboarding hotspot"
 fi
 ok "Root partition stripped + first boot re-armed"
+
+# 8b. CRITICAL robustness: make the virtual-media (PIMSD) and kvmd-persistent
+#     (PIPST) mounts `nofail`. Stock PiKVM fstab has neither, so a single failed
+#     mount of a NON-essential partition takes down local-fs.target and blocks the
+#     whole boot - no SSH, no kvmd, no web (exactly what bricked the first flashed
+#     unit after the MSD resize). With nofail, worst case the unit boots normally
+#     with MSD simply unmounted. Idempotent (skips if nofail already present).
+if [[ -f "$R/etc/fstab" ]]; then
+    python3 - "$R/etc/fstab" <<'PY' 2>/dev/null || \
+    sed -i -E '/LABEL=(PIMSD|PIPST)/ { /nofail/! s/errors=remount-ro/errors=remount-ro,nofail,x-systemd.device-timeout=15s/ }' "$R/etc/fstab"
+import sys,re
+p=sys.argv[1]; out=[]
+for ln in open(p):
+    if re.search(r'LABEL=(PIMSD|PIPST)', ln) and 'nofail' not in ln:
+        cols=ln.split()
+        if len(cols)>=6:
+            opts=cols[3].split(',')
+            opts += ['nofail','x-systemd.device-timeout=15s']
+            cols[3]=','.join(opts); cols[5]='0'   # fsck pass 0: never block boot on fsck either
+            ln='  '.join(cols)+'\n'
+    out.append(ln)
+open(p,'w').writelines(out)
+PY
+    ok "PIMSD + PIPST mounts made nofail (a bad virtual-media partition can no longer block boot)"
+fi
 
 # 9. MSD partition: the golden unit's uploaded ISO images. Large + personal;
 #    never ship them. (kvmd-specific; DIY has no equivalent.)
