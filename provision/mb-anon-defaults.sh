@@ -60,5 +60,25 @@ else
     echo "MAC autospoof opted out"
 fi
 
+# ---- Kill kvmd's mDNS product advert -----------------------------------------
+# kvmd ships /etc/avahi/services/pikvm.service advertising _pikvm._tcp / _https
+# with "PiKVM Web Server", "Raspberry Pi Compute Module 4", board=rpi4,
+# model=v4mini and the serial — a full stack of tells to anyone doing mDNS
+# discovery. Neutralise it (idempotent: only rewrite if it still has tells), so
+# the realistic <hostname>.local still resolves but nothing product-y is broadcast.
+AV=/etc/avahi/services/pikvm.service
+if [ -f "$AV" ] && grep -qiE '_pikvm|PiKVM|Compute Module|board=rpi' "$AV" 2>/dev/null; then
+    cat > "$AV" <<'XML'
+<?xml version="1.0" standalone='no'?>
+<!DOCTYPE service-group SYSTEM "avahi-service.dtd">
+<!-- Neutralized by MagicBridge: kvmd's _pikvm._tcp advert leaked PiKVM/RPi/serial tells over mDNS. -->
+<service-group>
+  <name replace-wildcards="yes">%h</name>
+</service-group>
+XML
+    echo "neutralized kvmd mDNS advert ($AV)"
+    systemctl is-active --quiet avahi-daemon && systemctl reload avahi-daemon 2>/dev/null
+fi
+
 mb_ro
 exit 0
