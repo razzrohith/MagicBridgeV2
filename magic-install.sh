@@ -228,6 +228,14 @@ phase6_enable() {
   run "chmod +x '$INSTALL_ROOT/provision/mb-firstboot.sh' 2>/dev/null || true"
   [ -f /etc/systemd/system/mb-firstboot.service ] && run "systemctl enable mb-firstboot.service 2>/dev/null || true"
   run "mkdir -p /var/lib/magicbridge && touch /var/lib/magicbridge/.mb-firstboot-done"
+  # Post-boot finalize part 2 (MSD grow + unique EDID serial). Runs once, after
+  # the system is up — never in the boot-critical path. Same marker discipline as
+  # above so a DIRECT install doesn't re-grow/re-EDID this device.
+  run "chmod +x '$INSTALL_ROOT/provision/mb-firstboot-late.sh' 2>/dev/null || true"
+  [ -f "$INSTALL_ROOT/systemd/mb-firstboot-late.service" ] && run "install -Dm644 '$INSTALL_ROOT/systemd/mb-firstboot-late.service' /etc/systemd/system/mb-firstboot-late.service"
+  run "systemctl daemon-reload 2>/dev/null || true"
+  [ -f /etc/systemd/system/mb-firstboot-late.service ] && run "systemctl enable mb-firstboot-late.service 2>/dev/null || true"
+  run "touch /var/lib/magicbridge/.mb-firstboot-late-done"
   # Realistic-defaults boot service (idempotent: keeps stable per-unit hostname + MAC).
   run "chmod +x '$INSTALL_ROOT/provision/mb-anon-defaults.sh' 2>/dev/null || true"
   [ -f /etc/systemd/system/mb-anon-defaults.service ] && run "systemctl enable mb-anon-defaults.service 2>/dev/null || true"

@@ -23,6 +23,7 @@ mb_rw
 
 # Re-arm first-boot so the flashed card runs mb-firstboot on its first power-on.
 rm -f /var/lib/magicbridge/.mb-firstboot-done
+rm -f /var/lib/magicbridge/.mb-firstboot-late-done   # post-boot MSD grow + EDID re-run
 
 # Drop this unit's UNIQUE identity (regenerated per-card on first boot).
 rm -f /etc/ssh/ssh_host_*

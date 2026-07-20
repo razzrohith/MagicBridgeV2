@@ -1,0 +1,19 @@
+[Unit]
+Description=MagicBridge first-boot finalize, part 2 (MSD grow + unique EDID, post-boot)
+# Run AFTER the system is fully up so the capture device exists and MSD can be
+# resized online. This is intentionally NOT ordered before anything, so it can
+# never block boot or WiFi provisioning — the worst case is a smaller MSD.
+After=kvmd.service multi-user.target
+Wants=kvmd.service
+# Only after the main first-boot finished, and only once.
+ConditionPathExists=/var/lib/magicbridge/.mb-firstboot-done
+ConditionPathExists=!/var/lib/magicbridge/.mb-firstboot-late-done
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/bin/bash /opt/magicbridge/provision/mb-firstboot-late.sh
+TimeoutStartSec=900
+
+[Install]
+WantedBy=multi-user.target

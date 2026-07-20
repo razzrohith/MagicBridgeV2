@@ -181,6 +181,8 @@ if [[ "$MODE" == "verify" ]]; then
     chk "htpasswd has no stock admin user"     '! cut -d: -f1 "$R/etc/kvmd/htpasswd" 2>/dev/null | grep -qx admin'
     chk "PIMSD mount is nofail (cannot block boot)" 'grep -qE "LABEL=PIMSD.*nofail" "$R/etc/fstab"'
     chk "PIPST mount is nofail (cannot block boot)" 'grep -qE "LABEL=PIPST.*nofail" "$R/etc/fstab"'
+    chk "mb-firstboot-late ENABLED (MSD grow + EDID)" '[[ -L "$R/etc/systemd/system/multi-user.target.wants/mb-firstboot-late.service" ]]'
+    chk "mb-firstboot-late marker cleared"           '[[ ! -e "$R/var/lib/magicbridge/.mb-firstboot-late-done" ]]'
     if [[ -n "$MSDPART" ]]; then
         mount "$MSDPART" "$MNT/msd" 2>/dev/null || true
         chk "MSD has no uploaded images" '[[ -z "$(find "$MNT/msd" -maxdepth 1 -type f ! -name ".*" 2>/dev/null)" ]]'
@@ -265,6 +267,21 @@ if [[ -f "$R/etc/systemd/system/mb-portal.service" ]]; then
     ok "mb-portal enabled (multi-user.target) - hotspot comes up when there's no WiFi"
 else
     warn "mb-portal.service missing - a flashed unit will have no WiFi onboarding hotspot"
+fi
+# mb-firstboot-late: post-boot, one-time MSD-grow + unique-EDID-serial. Self-heal
+# it from the tree (installer-gap safe), enable it, and clear its marker so a
+# flashed unit re-runs it. It runs AFTER boot, so it can never block boot/WiFi.
+rm -f "$R/var/lib/magicbridge/.mb-firstboot-late-done" 2>/dev/null || true
+if [[ ! -f "$R/etc/systemd/system/mb-firstboot-late.service" && -f "$R/opt/magicbridge/systemd/mb-firstboot-late.service" ]]; then
+    install -Dm644 "$R/opt/magicbridge/systemd/mb-firstboot-late.service" \
+                   "$R/etc/systemd/system/mb-firstboot-late.service"
+fi
+if [[ -f "$R/etc/systemd/system/mb-firstboot-late.service" ]]; then
+    mkdir -p "$R/etc/systemd/system/multi-user.target.wants"
+    ln -sf ../mb-firstboot-late.service "$R/etc/systemd/system/multi-user.target.wants/mb-firstboot-late.service"
+    ok "mb-firstboot-late enabled (post-boot MSD grow + unique EDID)"
+else
+    warn "mb-firstboot-late.service missing - MSD won't auto-grow (harmless: run mb-expand-msd.sh later)"
 fi
 ok "Root partition stripped + first boot re-armed"
 
