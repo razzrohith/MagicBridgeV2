@@ -51,6 +51,20 @@ if command -v kvmd-edidconf >/dev/null 2>&1 && [ -e /dev/kvmd-video -o -e /dev/v
     mb_ro
 fi
 
+# 2b. Defensive net for handoff 24-i: a fresh flash ships with SSH keys + TLS cert
+#     STRIPPED, so if sshd/kvmd-nginx somehow started before mb-firstboot
+#     regenerated them (a slow-keygen race), they'd be dead with nothing to restart
+#     them. We're normally safe (mb-firstboot is Before=sysinit, so keys exist
+#     first — verified live), but recover here as belt-and-suspenders. Restart ONLY
+#     if actually failed, and ONLY from here (post-boot): doing this INSIDE
+#     mb-firstboot would deadlock, because kvmd-nginx is ordered after it (24-ii).
+for svc in sshd kvmd-nginx; do
+    if systemctl is-failed --quiet "$svc" 2>/dev/null; then
+        echo "recovering failed $svc (24-i)"
+        systemctl restart "$svc" 2>/dev/null
+    fi
+done
+
 # 3. Mark done — force rw first (same lesson as mb-firstboot: mb-anon-defaults /
 #    the EDID block above may have left the rootfs read-only, and a silent RO
 #    write here would make this re-run every boot and re-randomize the EDID).

@@ -119,6 +119,11 @@ done
 while true; do
     setup_ap
     [ -x "$OLED" ] && "$OLED" "WiFi setup needed" "Join hotspot:" "$AP_SSID"
+    # Drop a Windows/macOS-readable report on the FAT boot partition each time the
+    # hotspot comes up. If the AP or portal is broken, this is how a user with only
+    # a card reader can see WHY (hostapd state, who holds :80, portal log) — the
+    # ext4 logs are unreadable off-Pi. Best-effort; never blocks provisioning.
+    [ -f /opt/magicbridge/provision/mb-boot-report.sh ] && bash /opt/magicbridge/provision/mb-boot-report.sh hotspot-up 2>/dev/null
     echo "[$(date)] waiting for credentials (no timeout) ..."
     rm -f "$WIFI_FILE" "$TS_KEY"
     python3 "$PORTAL" "$AP_IP" "$PORT" "$WIFI_FILE" "$TS_KEY"   # blocks until submit

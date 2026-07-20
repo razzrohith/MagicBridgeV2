@@ -82,6 +82,10 @@ date > "$MARKER" 2>/dev/null
 sync
 
 mb_ro
+# Mirror a plain-text report to the FAT boot partition. If this unit ends up stuck
+# (no WiFi, no hotspot) it is unreachable and its ext4 logs can't be read on
+# Windows/macOS — PIBOOT can. Best-effort; never blocks the boot.
+[ -f "$ROOT/provision/mb-boot-report.sh" ] && bash "$ROOT/provision/mb-boot-report.sh" firstboot-done 2>/dev/null
 echo "[$(date)] mb-firstboot done — handing off to WiFi onboarding"
 # Don't --resume the OLED here: mb-portal shows the "connect to hotspot" message
 # next if there's no network, or resumes the normal display if WiFi is already set.
