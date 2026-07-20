@@ -132,6 +132,22 @@
   MSD size on the first flashed card; if it did not grow, the unit still works fine
   (root is a separate partition) and only virtual-media capacity is affected.
 
+### 🔧 Feature fixes from the deep-analysis backlog (2026-07-20, `7e11c51`)
+Device OFFLINE → code + syntax/headless-parse verified; runtime confirm pending-device.
+- **Video FPS readout** (was `—`): the old per-`<img>`-load estimate never fires in
+  Chrome for multipart MJPEG. Now read from kvmd's own `queued_fps`/`captured_fps`
+  in the 5s status poll — reliable in every browser.
+- **USB MSD-hide / safe-mode** (was an inert stored TODO): safe-mode now trims the
+  gadget for real — `write_otg_override(hide_msd)` emits
+  `otg.devices.msd.default.enabled=false`, removing the mass-storage interface (a
+  real Logitech receiver has none — the last USB tell). Applies live + reports the
+  virtual-media trade-off. Default unchanged (MSD on); safe-mode is the opt-in.
+  ⏳ true auto-hide-on-empty (mount-event driven) is a follow-up.
+- **Login brute-force lockout:** stealth gate = per-IP escalating lockout in-code
+  (5 free, then 15s→15min doubling; 429 + UI message); main kvmd login = nginx
+  `limit_req` ~12/min on `/api/auth/login` only, via `mb-nginx-ratelimit.sh` that
+  self-verifies + self-reverts (web UI can never go down) and runs post-boot.
+
 ### 🔁 DIY imaging sync — first-boot bug audit + repo-HEAD base (handoff 24/25, 2026-07-20)
 Device was OFFLINE (flashed unit not on the LAN) → prepared + committed, on-hardware confirm pending.
 - **24-i SSH/web dead on fresh flash → ALREADY SAFE** (`4c728d1`): mb-firstboot is
