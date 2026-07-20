@@ -183,6 +183,9 @@ if [[ "$MODE" == "verify" ]]; then
     chk "PIPST mount is nofail (cannot block boot)" 'grep -qE "LABEL=PIPST.*nofail" "$R/etc/fstab"'
     chk "mb-firstboot-late ENABLED (MSD grow + EDID)" '[[ -L "$R/etc/systemd/system/multi-user.target.wants/mb-firstboot-late.service" ]]'
     chk "mb-firstboot-late marker cleared"           '[[ ! -e "$R/var/lib/magicbridge/.mb-firstboot-late-done" ]]'
+    git config --global --add safe.directory "$R/opt/magicbridge" 2>/dev/null || true
+    chk "baked repo tree is CLEAN (item 25: up-to-date)" '[[ -z "$(git -C "$R/opt/magicbridge" status --short 2>/dev/null)" ]]'
+    chk "no wtmp/btmp login history shipped"          '! ls "$R"/var/log/wtmp "$R"/var/log/btmp >/dev/null 2>&1'
     if [[ -n "$MSDPART" ]]; then
         mount "$MSDPART" "$MNT/msd" 2>/dev/null || true
         chk "MSD has no uploaded images" '[[ -z "$(find "$MNT/msd" -maxdepth 1 -type f ! -name ".*" 2>/dev/null)" ]]'
@@ -197,6 +200,29 @@ fi
 #  ARM MODE
 # =========================================================================
 info "Stripping per-unit identity + secrets..."
+
+# 0. ITEM 25: ship the baked repo at CLEAN origin/main HEAD. Otherwise a fresh
+#    unit reports "N commits behind" and does a pointless day-one full reinstall
+#    (the golden card was snapshotted at whatever commit it happened to be on, and
+#    any in-image patching leaves the tree dirty). Syncing to HEAD also pulls in
+#    every committed fix cleanly, so we no longer hand-patch scripts into the image.
+#    Runs BEFORE the first-boot re-arm below, which reads systemd units from the tree.
+if git -C "$R/opt/magicbridge" rev-parse >/dev/null 2>&1; then
+    git config --global --add safe.directory "$R/opt/magicbridge" 2>/dev/null || true
+    if git -C "$R/opt/magicbridge" fetch origin main -q 2>/dev/null; then
+        git -C "$R/opt/magicbridge" reset --hard origin/main -q 2>/dev/null
+    else
+        warn "no network to fetch origin - baked repo stays at its current commit ($(git -C "$R/opt/magicbridge" rev-parse --short HEAD 2>/dev/null))"
+        git -C "$R/opt/magicbridge" reset --hard HEAD -q 2>/dev/null   # at least make it clean
+    fi
+    git -C "$R/opt/magicbridge" clean -fdq 2>/dev/null   # drop __pycache__ + stray files
+    ok "baked repo at clean HEAD $(git -C "$R/opt/magicbridge" rev-parse --short HEAD 2>/dev/null) (fresh unit reports up-to-date)"
+else
+    warn "no git tree at /opt/magicbridge in the image - skipping repo-HEAD sync"
+fi
+# wtmp/btmp/lastlog: on PiKVM /var/log is tmpfs so these never persist to the card,
+# but strip any on-disk copies defensively (login/reboot history cross-links units).
+rm -f "$R"/var/log/wtmp* "$R"/var/log/btmp* "$R"/var/log/lastlog 2>/dev/null || true
 
 # 1. Host identity
 rm -f "$R"/etc/ssh/ssh_host_* 2>/dev/null || true
