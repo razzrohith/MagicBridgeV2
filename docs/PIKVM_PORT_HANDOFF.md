@@ -286,8 +286,16 @@ check PiKVM's own equivalent · **[PORT-concept]** take the idea, not the code.
     success-only step; `update_check` compares that STAMP to origin, never HEAD; a
     missing/garbage stamp returns `deployment unverified → reinstall`.
     `magic-install.sh` and `build-image.sh` stamp too, so installed/flashed units
-    start honest. ⏳ on-hardware interrupt test (kill mid-apply, then ask the UI)
-    pending device access — NordVPN is blocking the LAN again (item 28).
+    start honest. **VERIFIED ON HARDWARE (172.16.20.171):** reproduced the exact
+    post-`git reset`/pre-stamp state a mid-apply crash leaves (tree at HEAD, stamp
+    one behind) — the OLD `HEAD..origin` check reports "0 behind → up to date" (the
+    bug), the NEW stamp-based check reports "1 update available" (caught). Missing
+    stamp → "deployment unverified → reinstall". A REAL `POST /update/apply`
+    round-trip (unit one commit back → apply → deploys + stamps as last step →
+    "up to date") confirmed end-to-end. Also fixed a wart the live apply exposed
+    (`4801639`): the old `git config --global safe.directory` could never write
+    `/root/.gitconfig` on the RO rootfs — dropped it for inline `git -c
+    safe.directory=` (root owns the repo, so no ownership check fires anyway).
 32. **The installer pulls the repo it is RUNNING FROM** `[PORT — subtle, silent]`
     — `git` replaces a file by rename, so the already-open fd still points at the
     OLD inode and bash executes the **pre-pull text to the end**. The freshly
@@ -346,9 +354,12 @@ check PiKVM's own equivalent · **[PORT-concept]** take the idea, not the code.
     bounces to login once; `piPower` now checks the result too. Server side is
     already-safe: the only `Popen` is the non-critical OLED animation, and the
     power path goes through kvmd's ATX API (real HTTP status via the shim), so
-    there's no fire-and-forget `ok:True` masking a failed command. Discovered in
-    passing: the "Shutdown/Reboot Pi" buttons actually drive kvmd ATX = the
-    TARGET's power, not the Pi (see item 35) — a mislabel, flagged separately.
+    there's no fire-and-forget `ok:True` masking a failed command. **VERIFIED ON
+    HARDWARE (headless Chrome):** logged into the cockpit, wiped the session
+    cookies, then triggered a control — the wrapper bounced the page to `/login/`
+    instead of a silent no-op. Discovered in passing: the "Shutdown/Reboot Pi"
+    buttons actually drive kvmd ATX = the TARGET's power, not the Pi (see item 35)
+    — a mislabel, flagged separately.
 35. **Power actions and update actions knew nothing about each other** `[PORT]`
     — the UI let a shutdown land in the middle of `install.sh`. Worse, the
     aftermath *looks* like a hang: a halted Pi keeps the OLED powered but stops

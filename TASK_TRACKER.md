@@ -148,6 +148,39 @@ Device OFFLINE → code + syntax/headless-parse verified; runtime confirm pendin
   `limit_req` ~12/min on `/api/auth/login` only, via `mb-nginx-ratelimit.sh` that
   self-verifies + self-reverts (web UI can never go down) and runs post-boot.
 
+### ✅ Handoff items 31-36 — updater "reports success but not live" family (2026-07-21)
+DIY session added 31-36 (all one failure mode: a change that reports success but
+isn't live). Checked each against OUR code, fixed only what's real, verified on the
+live unit @ 172.16.20.171.
+- **31 — updater said "up to date" while nothing deployed: REAL, FIXED** (`4801639`).
+  `update_check` compared clone HEAD to origin; `update_apply` did `git reset` FIRST
+  then restarted — an interrupt in between left HEAD==origin → fake "up to date", no
+  UI retry. Now: apply deploys structural bits (units/nginx/override) when changed,
+  then STAMPS `/opt/magicbridge/.mb-deployed` as its last success-only step; check
+  compares the STAMP to origin, never HEAD; missing stamp → "deployment unverified →
+  reinstall". magic-install + build-image stamp too. **Verified on hardware:**
+  reproduced the mid-apply state (old check "0 behind", new check "1 available"),
+  missing-stamp → reinstall, and a REAL apply round-trip deploy+stamp → "up to date".
+- **34 — expired session made every control a silent no-op: REAL (client), FIXED**
+  (`4801639`). One 401 wrapper around the real fetch (auth endpoints excluded) →
+  bounce to login once; piPower checks its result. **Verified on hardware** (headless
+  Chrome: wiped cookies, triggered a control → bounced to /login/). Server-side
+  already-safe (only non-critical OLED Popen; power via kvmd ATX = real status).
+- **32 N/A** — updater is a Python handler, not a self-pulling bash script; the only
+  installer (magic-install.sh) doesn't git-pull. No open-fd/old-inode hazard.
+- **33 N/A** — update path does no config migration; it restarts every sidecar anyway.
+- **35 N/A** — no UI control halts the Pi ("Shutdown/Reboot Pi" → kvmd ATX = the
+  TARGET's power; no Pi self-poweroff anywhere). Nothing can land a shutdown mid-apply.
+- **36 already-safe** — allowlist classifier, not "unknown→full"; 25-commit audit:
+  2 fulls, both genuine (real systemd unit changes), zero false-fulls.
+- **Bug the live apply exposed + fixed** (`4801639`): `git config --global
+  safe.directory` could never write /root/.gitconfig on the RO rootfs (noisy
+  `$HOME not set` / RO error every apply) → replaced with inline `git -c
+  safe.directory=`; root owns the repo so no ownership check fires. Dogfooded clean.
+- **Discovered, NOT fixed (separate bug):** the "Shutdown/Reboot Pi" buttons drive
+  kvmd ATX = the TARGET's power, not the Pi. Mislabel — flag for its own task.
+- Device left at `4801639`, honest stamp, "up to date", all services active.
+
 ### ✅ ON-HARDWARE verification (device back online @ 172.16.20.171, 2026-07-21)
 Reached it only after disabling NordVPN — the item-28 gotcha proving itself (VPN blocks LAN).
 Deployed HEAD, then tested live. Two things my OFFLINE work had gotten wrong, caught + fixed:
