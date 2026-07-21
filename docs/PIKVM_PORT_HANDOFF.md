@@ -215,19 +215,6 @@ check PiKVM's own equivalent · **[PORT-concept]** take the idea, not the code.
     power-cycle message, (e) raise the unit's `TimeoutStartSec` so a retry can't
     be killed mid-flow. Check `mb-portal.sh`/kvmd's equivalent: **any** path that
     tears down the AP before confirming the new connection has this bug.
-    **→ PiKVM 2026-07-20 (`4f1c420`): FIXED (b,d,e); a,c already-safe by design.**
-    Reproduced the core defect — `save_wifi` blind-APPENDED a network block, so a
-    mistyped PSK stayed in the conf forever and a retry left TWO blocks for one SSID
-    (wpa_supplicant can keep trying the bad one). (b) now REPLACES the SSID's block
-    before writing new creds — verified: wrong→retry = exactly 1 block, bad PSK gone,
-    other/open nets preserved. (e) `mb-portal.service` TimeoutStartSec 1200→infinity
-    (the cap SIGTERM'd the oneshot after 20 min and hostapd/dnsmasq in its cgroup
-    died with it → stranded; nothing is ordered After= it). (d) back-off guard so a
-    crashing portal (:8080 busy) can't tight-spin hostapd. (a,c) verify+re-raise is
-    inherent to our design: we save creds + reboot; the next boot polls ~40 s and
-    re-raises the hotspot if WiFi failed — the AP is never torn down before the new
-    connection is confirmed and "Connected" is never announced early. ⏳ on-hardware
-    wrong-PSK retry pending (device offline).
 27. **Stale unit files in the image silently undo script fixes** `[PORT]` — the
     26 fix landed in the script, but the built image still carried the OLD
     `.service` (with the short timeout) because the image builder only deployed
@@ -236,13 +223,6 @@ check PiKVM's own equivalent · **[PORT-concept]** take the idea, not the code.
     values that matter (DIY now asserts the retry logic is present, the timeout
     is raised, and the mDNS alias is set) so this fails the build instead of
     shipping. Caught only by verifying the built artifact, not the commit.
-    **→ PiKVM 2026-07-20 (`5c15168`): FIXED, proven on the built artifact.** The
-    real `dist.img` carried `mb-portal.service` with the OLD 1200s timeout while the
-    repo had the fix — the builder only self-healed `mb-firstboot`. build-image now
-    re-deploys EVERY repo unit after the HEAD-sync, and `--verify` asserts the VALUES
-    (every installed unit byte-matches the repo, mb-portal timeout uncapped, wifi
-    save replaces) — those would have failed the stale build. Re-verified the image:
-    installed timeout is now `infinity`, 25/25 checks pass.
 28. **Headless (no-OLED) units need a name — mDNS default reversed** `[PORT-concept]`
     — with no screen there is no way to discover the unit's IP, so DIY reversed
     item 5b and now ships `mdns_alias="magicbridge"` **on by default**
@@ -252,34 +232,186 @@ check PiKVM's own equivalent · **[PORT-concept]** take the idea, not the code.
     stealth — the target (USB/HDMI) never sees it either way. Also worth knowing:
     when `.local` "doesn't work" it is almost always a **client-side VPN**
     (NordVPN etc.) hijacking DNS / blocking LAN mDNS, not the unit.
-    **→ PiKVM 2026-07-20 (`d5f3a95`): DELIBERATELY DIFFERENT — do NOT copy the
-    brand-on default.** It would contradict our verified item-5b anti-tell decision
-    (the unit must look like an ordinary PC on the LAN, not "magicbridge"). PiKVM
-    already ships BETTER headless reach than DIY: a UNIQUE, stable, innocuous
-    per-unit `DESKTOP-XXXXXXX.local` (regenerated per unit by secret-reset, survives
-    a fresh flash, so a fleet never collides), and avahi runs with BOTH
-    `avahi-daemon.service` AND `.socket` enabled+unmasked (verified in the image).
-    The only gap was the owner not knowing the name → the PIBOOT boot report now
-    prints `REACH ME AT: https://<hostname>.local/` + avahi state + the "`.local`
-    fails ⇒ client-side VPN blocking mDNS" note. Branded alias stays opt-in
-    (`MB_MDNS_ALIASES`), so nothing is silently copied.
 29. **USB capture that vanishes is a POWER problem, not software** `[VERIFY]` —
     a DIY unit powered over USB-C from a laptop port showed "NO CAPTURE DEVICE":
     `lsusb` listed no capture device and `/dev/video1` was gone, after having
     worked minutes earlier. Enumerate→work→disappear = insufficient USB power.
     Before debugging capture code, check `vcgencmd get_throttled` and put the Pi
     on a real 5V/3A supply. (The same unit also dropped off the network entirely.)
-    **→ PiKVM 2026-07-20 (`d5f3a95`): surfaced everywhere for self-diagnosis.** The
-    cockpit already reported under-voltage in System→Power&Health; added an
-    ALWAYS-visible top-bar "⚠ LOW POWER" banner (shown on every tab while
-    under-volting, not just that sub-panel). The PIBOOT boot report now decodes
-    `vcgencmd get_throttled`, flags the bits, and calls out a vanished `/dev/video0`
-    that worked earlier as a POWER problem, not capture code — so it self-diagnoses.
+
+30. **New config defaults NEVER reach already-installed units** `[PORT — check hard]`
+    — the sharpest one of this batch, because it makes a "shipped" fix silently
+    a no-op on the existing fleet. DIY's installer wrote `config.json` only when
+    it was **absent** (`"already exists, skipping"`). So a Pi upgraded through
+    the web UI took every code change — repo HEAD, the item-26 WiFi retry, the
+    item-27 timeout — and STILL had no `mdns_alias`, leaving `magicbridge.local`
+    dead on exactly the headless units item 28 added it for. Every future default
+    had the same hole. Fix: **backfill MISSING keys only**, never overwrite an
+    existing value (so a deliberate `mdns_alias:""` survives, and auth hashes /
+    saved settings are untouched), write via temp+`os.replace` so an interrupted
+    upgrade can't truncate the config and brick the backend, and make it
+    idempotent. CHECK your own installer/updater: does an upgrade reconcile
+    config schema, or only code? Test it the honest way — take a unit installed
+    from an OLD build, upgrade it through the real UI path, and diff its config
+    against the current defaults. A green update log is not evidence.
+    Related trap: DIY only caught this because the update classifier treats
+    `install.sh` as structural and re-runs it; if your updater only rsyncs files,
+    a config migration will never run at all.
+
+31. **The updater reported "up to date" while running NONE of the update** `[PORT — the worst one]`
+    — a shutdown landed mid-`install.sh`. The `git pull` had already succeeded,
+    so the clone sat at the new commit while **nothing was deployed** — and
+    because the updater compared clone-HEAD to origin, the UI said *"Up to
+    date"* and there was **no way to retry from the web UI at all**. Verified on
+    the live unit: repo at the new SHA, running `index.html` missing its newest
+    code, config missing its newest key. Silently stale, and claiming to be
+    current. Root cause is structural and almost certainly present in any
+    pull-then-install updater: **the pull advances state that the install has not
+    yet applied.** Fix: the installer stamps a `deployed-commit` file as its LAST
+    step, success-only (and the incremental path stamps after its copies), and
+    the updater compares THAT to origin — never HEAD. A missing/garbage stamp
+    must report "deployment unverified → reinstall", so a unit can never be
+    trapped in a fake up-to-date state. CHECK: kill your installer halfway, then
+    ask the UI whether an update is available. If it says no, you have this bug.
+    **→ PiKVM 2026-07-21 (`535391b`): FIXED — this was real.** Our web updater
+    (`magicbridge-net`: `update_check`/`update_apply`) had exactly the structural
+    hole: `update_check` counted `git rev-list HEAD..origin/main`, and
+    `update_apply` did `git fetch && git reset --hard origin/main` FIRST, then
+    restarted the sidecars — so an apply interrupted after the reset (HEAD already
+    at origin) but before the restart left the unit running OLD code while the
+    check reported *"up to date"*, with no UI retry. Fix: `update_apply` now
+    deploys the structural bits a plain reset only drops on disk (systemd units +
+    `magicbridge.conf` + kvmd override) when they changed, then STAMPS the
+    fully-deployed commit to `/opt/magicbridge/.mb-deployed` as its last
+    success-only step; `update_check` compares that STAMP to origin, never HEAD; a
+    missing/garbage stamp returns `deployment unverified → reinstall`.
+    `magic-install.sh` and `build-image.sh` stamp too, so installed/flashed units
+    start honest. ⏳ on-hardware interrupt test (kill mid-apply, then ask the UI)
+    pending device access — NordVPN is blocking the LAN again (item 28).
+32. **The installer pulls the repo it is RUNNING FROM** `[PORT — subtle, silent]`
+    — `git` replaces a file by rename, so the already-open fd still points at the
+    OLD inode and bash executes the **pre-pull text to the end**. The freshly
+    pulled installer logic never runs, and the script **exits 0**. Concretely:
+    the item-31 stamp landed on disk and was silently skipped; the run "succeeded"
+    while doing the old thing, and the stamp only appeared on a *second* run.
+    Fix: checksum `$0` around the pull and re-exec if it changed, bounded by an
+    env var so it can re-exec exactly once. CHECK any script that updates its own
+    source tree — a green exit code proves nothing here.
+    **→ PiKVM 2026-07-21: N/A (mechanism absent).** Our updater is a Python
+    aiohttp handler (`update_apply`), not a bash script that git-pulls its own
+    source. `git reset` overwrites `app.py` on disk, but the running interpreter
+    already holds the module in memory and runs the loaded handler to completion —
+    which is exactly what we want, since it restarts `magicbridge-net` as its LAST
+    act to pick up the new code. There is no "open fd → old inode → bash runs the
+    pre-pull text to the end" hazard, because nothing here executes the file it is
+    rewriting line-by-line. Verified the only installer, `magic-install.sh`, does
+    NOT self-pull (no `git pull`/`fetch`/`reset` inside it — it installs from an
+    already-checked-out tree; `align_pi.py` does the fetch, and it runs on the dev
+    box, not the Pi). The checksum-and-re-exec fix has nothing to guard here. If a
+    bash self-updater is ever added, port item 32 then.
+33. **A config-read-once service needs restarting after a config migration**
+    `[PORT]` — the item-30 backfill added the mDNS key long after that oneshot had
+    already run and exited with "no alias configured", so the unit stayed
+    unreachable by name until a reboot. Migrating config is only half the job;
+    restart whatever caches it, and report which way it ended up.
+    **→ PiKVM 2026-07-21: N/A (no config migration in the update path).**
+    `update_apply` is pure `git reset` + restart of all three sidecars + nginx
+    reload — there is no backfill step that adds a config key, so there's no
+    "oneshot already read the config and exited before the key appeared" window.
+    (Item 30's backfill mechanism doesn't exist here either: our services read
+    kvmd's own config plus runtime override files written on demand by the stealth
+    panel — not a versioned `config.json` whose schema grows per release.) And
+    because `update_apply` restarts every sidecar unconditionally, anything a
+    sidecar caches is already re-read on each update. If we later add an item-30
+    backfill, pair it with the matching restart per this item.
+34. **An expired session made EVERY control silently do nothing** `[PORT — check hard]`
+    — "Shutdown Pi" appeared to work and the Pi stayed up. nginx had the truth:
+    `POST /api/power 401`, twice. Nothing in the UI checked `fetch()` status, so
+    the 401 was invisible and the button toasted "Shutting down…" *before* the
+    request even went out. Every other control shared the blind spot: an expired
+    session left the page looking alive and completely dead. Dangerous here
+    specifically — believing a Pi is off and pulling its power is exactly the
+    SD-corruption the button exists to prevent. Fix: ONE `fetch()` wrapper
+    handling 401 for every call site (toast + bounce to login, once, with the
+    login endpoint excluded so a wrong password can't loop) beats auditing ~40
+    call sites. Same class on the server: `Popen` fire-and-forget returned
+    `ok:True` even when the command failed, so broken sudo looked identical to
+    success — run it, check the return code, report the real error.
+    **→ PiKVM 2026-07-21 (`535391b`): FIXED client-side; server-side already-safe.**
+    The class was present in the UI: `piPower` toasted "Shutting down…" *before*
+    awaiting and never checked status, and the fetch shim's `g()/p()` swallow
+    errors — so an expired-session 401 was invisible and every control silently
+    no-op'd. Fixed with ONE wrapper around the real `fetch` that catches 401 for
+    every call site (auth endpoints excluded so a wrong password can't loop) and
+    bounces to login once; `piPower` now checks the result too. Server side is
+    already-safe: the only `Popen` is the non-critical OLED animation, and the
+    power path goes through kvmd's ATX API (real HTTP status via the shim), so
+    there's no fire-and-forget `ok:True` masking a failed command. Discovered in
+    passing: the "Shutdown/Reboot Pi" buttons actually drive kvmd ATX = the
+    TARGET's power, not the Pi (see item 35) — a mislabel, flagged separately.
+35. **Power actions and update actions knew nothing about each other** `[PORT]`
+    — the UI let a shutdown land in the middle of `install.sh`. Worse, the
+    aftermath *looks* like a hang: a halted Pi keeps the OLED powered but stops
+    driving it, so the panel freezes on "Upgrading" forever and invites a power
+    pull on top of an already-interrupted install. Fix: run the upgrade as a
+    **named** unit (not an anonymous transient) so "is an upgrade in flight?" is
+    answerable, have the power endpoint return 409-busy, make the UI raise a
+    second explicit confirm rather than a toast, and keep a `force` override so a
+    wedged upgrade can never permanently trap a unit.
+    **→ PiKVM 2026-07-21: N/A (no UI control halts the Pi).** The failure needs a
+    UI button that can shut down the Pi mid-upgrade; we have none. "Shutdown/Reboot
+    Pi" → `/api/power` → kvmd `/api/atx/power` = the connected TARGET's ATX power
+    button, and a repo-wide grep confirms there is NO Pi self-poweroff/reboot
+    endpoint anywhere (only ATX/target). So a shutdown can't land on the Pi
+    mid-apply — the interlock has nothing to protect. (The buttons being labelled
+    "Pi" while they act on the target is a real but separate mislabel bug, not a
+    power/update race.) If a genuine Pi-power control is ever added, add the
+    named-unit "upgrade in flight?" interlock + 409-busy then.
+36. **Update classifier forced a full reinstall for files the Pi never runs**
+    `[PORT — low value, quick]` — classifying real history showed 7 of 25 commits
+    triggering a full reinstall, but 3 were classifier bugs: a **Windows** `.ps1`
+    helper that only ever runs on the operator's laptop, and a newly added Pi-side
+    script nobody had registered. Both hit the "unknown file → full" fallback.
+    Keep that fallback (an unregistered runtime file must reach the installer
+    rather than silently not deploy) but exclude host-only files and register new
+    ones. Worth doing the same audit: classify your last ~25 commits and look at
+    which fulls were genuine.
+    **→ PiKVM 2026-07-21: already-safe (audited).** Ran our own classifier over
+    the last 25 commits: only 2 were FULL (`4f1c420`, `6cde694`), both because
+    they changed real `systemd/*.service` files — both genuine, zero false-fulls.
+    The DIY bug can't occur here because our rule is an ALLOWLIST
+    (`^(systemd/|nginx/|magic-install.sh|kvmd-overrides/)` → full), not an
+    "unknown file → full" fallback — so host-only files (`*.ps1`, `align_pi.py`,
+    `deploy_*.py`) never force a full; they fall through to incremental, which for
+    us is `git reset` + sidecar restart: exactly right for a host-only file (it
+    lands in the tree and is simply never executed on the Pi). Inverse caveat: with
+    no unknown→full fallback, a brand-new *runtime* file that needs a special
+    install step outside `_deploy_structural`'s set (units/nginx/override) wouldn't
+    auto-deploy via the web updater — such files must be registered in
+    `magic-install.sh`. Acceptable given our narrow structural surface.
+
+**Amendment to item 29** (`get_throttled`): the DIY power work established the
+decode that makes it actionable — bits 0–3 are *happening now*, bits 16–19 are
+*has happened since boot* and are **sticky until power-cycle**. So `0x50000` means
+"under-voltage occurred at some point", NOT "under-voltage now"; a Pi can show it
+for hours because of a plug-in inrush transient that recovered in seconds
+(confirmed in dmesg: `Undervoltage detected!` → `Voltage normalised` 8s later).
+Read the two halves separately, and only trust a reading taken on a fresh boot.
+(The DIY power-path A/B results are deliberately NOT ported — different board,
+different power design.)
 
 ---
 
 ## Session commits (DIY repo `magicbridge-diy`, for reference)
 ```
+77f739f fix(install): re-exec after self-pull; restart mdns after backfill       (items 32,33)
+b81108c fix(update): track what is DEPLOYED, not what the repo clone is at       (item 31)
+c68363c fix(power): refuse to halt while a full upgrade is still running         (item 35)
+fe202af fix(ui): expired session made every control silently do nothing          (item 34)
+32b83f7 fix(update): stop forcing a full reinstall for files the Pi never runs   (item 36)
+8b7318f fix(config): backfill missing defaults on upgrade                        (item 30)
+ef76bf1 test(power): option-4 splitter passes clean; get_throttled sticky bits
+b90389a feat(diag): mb-power-test.sh - objective A/B test of power-path wiring
 fd5044b fix(image): deploy ALL unit files (stale .service undid the WiFi fix)    (item 27)
 f123533 fix(wifi): wrong password stranded the unit - verify + re-raise hotspot  (item 26)
 30cf625 feat(mdns): magicbridge.local ON by default (headless reachability)      (item 28)
