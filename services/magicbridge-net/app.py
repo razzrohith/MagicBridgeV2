@@ -113,9 +113,23 @@ def _iface_mac(iface):
         return None
 
 
+async def _lockdown_live() -> bool:
+    """Is lockdown ACTUALLY in force right now? The MB_LOCKDOWN chain can survive while
+    the `-j MB_LOCKDOWN` jump in INPUT does not, and nothing on this system persists
+    iptables across a reboot — so the jump is the only honest signal (item 42)."""
+    rc, _out = await sh_a("iptables", "-C", "INPUT", "-j", "MB_LOCKDOWN", timeout=6)
+    return rc == 0
+
+
 async def status(_):
     ts_rc, ts_out = await sh_a("tailscale", "status", "--json", timeout=8)
     cfg = load_config("net", {})
+    # Item 42: report the LIVE firewall state, not what we once saved. /status never
+    # returned `lockdown` at all, so the UI toggle (which reads s.lockdown) always
+    # showed OFF — and after a reboot the rules are genuinely gone while the saved
+    # config still says on, i.e. the user believes they're protected and they are not.
+    ld_live = await _lockdown_live()
+    ld_cfg = bool(cfg.get("lockdown"))
     # Report the LIVE MAC of the active interface (spoofed or not) so the System
     # page never shows a blank — the old code only surfaced a MAC if one had been
     # explicitly spoofed this session.
@@ -127,6 +141,9 @@ async def status(_):
         "hostname": os.uname().nodename,
         "mac": {"mac": active_mac, "spoofed": bool(cfg.get("mac"))},
         "macs": macs,
+        "lockdown": ld_live,                       # LIVE truth — what the UI toggle shows
+        "lockdown_configured": ld_cfg,             # what the user last asked for
+        "lockdown_drifted": (ld_cfg and not ld_live),   # e.g. after a reboot: silently OFF
     })
 
 
