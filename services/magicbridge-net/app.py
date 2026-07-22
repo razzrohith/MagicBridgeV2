@@ -595,17 +595,21 @@ def _write_stamp(sha):
         log.warning("deploy stamp write failed: %s", e)
 
 
-def _deploy_structural():
+def _deploy_structural() -> bool:
     """Install the structural bits (systemd units, nginx block, kvmd override) that a
     plain `git reset` drops onto disk but never activates — mirrors magic-install
     phase4/5 and build-image's self-heal. Idempotent; only called when structural
-    files actually changed, so the item-31 stamp can honestly claim 'deployed'."""
-    sh("bash", "-c",
+    files actually changed. Returns True on success so the caller can withhold the
+    item-31 stamp if the install failed (else the stamp would falsely claim the
+    structural bits are live). `[ -f X ] && install` is set -e-safe: a missing
+    optional file skips (test is a non-final && term), a real install failure aborts."""
+    rc, _out = sh("bash", "-c",
        'set -e; R=/opt/magicbridge; '
        'for u in "$R"/systemd/*.service; do [ -e "$u" ] && install -Dm644 "$u" "/etc/systemd/system/$(basename "$u")"; done; '
        '[ -f "$R/nginx/magicbridge.conf" ] && install -Dm644 "$R/nginx/magicbridge.conf" /etc/kvmd/nginx/magicbridge.conf; '
        '[ -f "$R/kvmd-overrides/override.d/00-magicbridge.yaml" ] && install -Dm644 "$R/kvmd-overrides/override.d/00-magicbridge.yaml" /etc/kvmd/override.d/00-magicbridge.yaml; '
        'systemctl daemon-reload', timeout=60)
+    return rc == 0
 
 
 # ---- EDID editor (kvmd-edidconf) -----------------------------------
@@ -881,7 +885,7 @@ async def update_apply(_):
     except Exception:
         oled = None
     prev = _read_stamp()          # what was fully deployed before this apply
-    rc, out, struct = 1, "", False
+    rc, out, struct, struct_ok = 1, "", False, True
     _rw()
     try:
         rc, out = sh("bash", "-c",
@@ -899,11 +903,13 @@ async def update_apply(_):
             else:
                 struct = True     # no known prior deploy → install structural bits to be safe
             if struct:
-                _deploy_structural()
+                struct_ok = _deploy_structural()
             # STAMP as the LAST deploy step, success-only, while the rootfs is still rw.
-            # An apply interrupted before this point leaves the OLD stamp, so update_check
-            # keeps offering the update instead of falsely reporting up-to-date (item 31).
-            _write_stamp(_head_sha())
+            # An apply interrupted before this point — OR a failed structural install —
+            # leaves the OLD stamp, so update_check keeps offering the update instead of
+            # falsely reporting up-to-date (item 31). Never stamp a half-deployed unit.
+            if struct_ok:
+                _write_stamp(_head_sha())
     finally:
         _ro()
     sh("systemctl", "reload", "kvmd-nginx", timeout=15)
@@ -927,7 +933,8 @@ async def update_apply(_):
     # Restart sidecars last; magicbridge-net restart ends this request.
     for svc in ("magicbridge-stealth", "magicbridge-agent", "magicbridge-net"):
         sh("systemctl", "restart", svc, timeout=15)
-    return web.json_response({"ok": rc == 0, "structural": struct, "detail": out[-1500:]})
+    return web.json_response({"ok": rc == 0 and struct_ok, "structural": struct,
+                              "structural_ok": struct_ok, "detail": out[-1500:]})
 
 
 def build_app():
