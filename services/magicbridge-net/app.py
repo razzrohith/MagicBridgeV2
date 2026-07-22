@@ -12,6 +12,7 @@ Ports V1's network features onto the PiKVM base WITHOUT touching kvmd:
 """
 from __future__ import annotations
 import asyncio
+import functools
 import os
 import re
 import subprocess
@@ -60,6 +61,30 @@ def sh(*args, timeout=15):
         return 1, str(e)
 
 
+# ---- item 37: keep long commands OFF the event loop ------------------
+# aiohttp is single-threaded, so a blocking subprocess.run inside an `async def`
+# handler freezes EVERYTHING for its whole duration — every connected client's
+# keyboard/mouse and all status polling. A `tailscale install` (pacman) or a
+# `wpa_cli scan` is seconds to minutes of a dead KVM. `sh_a` runs the same
+# command in the default thread-pool executor so the loop keeps serving input.
+# Rule: anything that can exceed a few hundred ms (network, package installs,
+# scans, iptables batches, systemctl start/stop, kvmd-edidconf --apply) goes
+# through sh_a / run_blocking; cheap local reads (git rev-parse, systemctl
+# is-active, reading /proc) stay inline — an executor hop isn't free either.
+async def sh_a(*args, timeout=15):
+    """Async `sh`: identical contract, executed off the event loop."""
+    loop = asyncio.get_running_loop()
+    return await loop.run_in_executor(None, functools.partial(sh, *args, timeout=timeout))
+
+
+async def run_blocking(fn, *a, **kw):
+    """Run one blocking helper (usually a BATCH of sh() calls) off the event loop.
+    Batching a whole sequence into a single executor hop is better than awaiting
+    each command separately — fewer context switches and the batch stays coherent."""
+    loop = asyncio.get_running_loop()
+    return await loop.run_in_executor(None, functools.partial(fn, *a, **kw))
+
+
 async def health(_):
     return web.json_response({"ok": True, "service": "magicbridge-net"})
 
@@ -89,7 +114,7 @@ def _iface_mac(iface):
 
 
 async def status(_):
-    ts_rc, ts_out = sh("tailscale", "status", "--json", timeout=8)
+    ts_rc, ts_out = await sh_a("tailscale", "status", "--json", timeout=8)
     cfg = load_config("net", {})
     # Report the LIVE MAC of the active interface (spoofed or not) so the System
     # page never shows a blank — the old code only surfaced a MAC if one had been
@@ -110,16 +135,16 @@ async def net_latency(_):
     Everything is best-effort; missing pieces come back as null rather than erroring."""
     out = {"ok": True}
     # default gateway
-    rc, route = sh("bash", "-c", "ip route | awk '/^default/{print $3; exit}'", timeout=6)
+    rc, route = await sh_a("bash", "-c", "ip route | awk '/^default/{print $3; exit}'", timeout=6)
     gw = route.strip() or None
     out["gateway"] = gw
     # RTT to gateway (fast, 3 pings)
     if gw:
-        rc, ping = sh("bash", "-c", "ping -c3 -W1 -i0.3 %s 2>/dev/null | tail -1" % gw, timeout=8)
+        rc, ping = await sh_a("bash", "-c", "ping -c3 -W1 -i0.3 %s 2>/dev/null | tail -1" % gw, timeout=8)
         m = re.search(r"=\s*[\d.]+/([\d.]+)/", ping)
         out["rtt_ms"] = round(float(m.group(1)), 1) if m else None
     # signal strength + negotiated bitrate from the WiFi driver
-    rc, link = sh("iw", "dev", "wlan0", "link", timeout=6)
+    rc, link = await sh_a("iw", "dev", "wlan0", "link", timeout=6)
     sig = re.search(r"signal:\s*(-?\d+)\s*dBm", link)
     br = re.search(r"tx bitrate:\s*([\d.]+)\s*MBit/s", link)
     ssid = re.search(r"SSID:\s*(.+)", link)
@@ -133,13 +158,13 @@ async def net_latency(_):
     return web.json_response(out)
 
 
-async def net_clients(_):
-    """GET /mb/net/clients — distinct remote peers with an established connection to
-    the web UI (:443), i.e. who is currently viewing this bridge. Adds reverse-DNS
-    hostname and a LAN/Tailscale/remote classification per client."""
+def _net_clients_blocking() -> list:
+    """`ss` plus a REVERSE-DNS lookup per client. socket.gethostbyaddr is blocking and
+    can hang for seconds on each unresolvable address, so with a few peers connected
+    this was one of the worst input-freezes in the service — offloaded (item 37)."""
     import socket
-    rc, out = sh("bash", "-c",
-                 "ss -Hntu state established '( sport = :443 )' 2>/dev/null | awk '{print $5}'", timeout=8)
+    _rc, out = sh("bash", "-c",
+                  "ss -Hntu state established '( sport = :443 )' 2>/dev/null | awk '{print $5}'", timeout=8)
     ips = {}
     for peer in out.splitlines():
         peer = peer.strip()
@@ -161,6 +186,14 @@ async def net_clients(_):
                 "lan" if ip.startswith(("192.168.", "10.", "172.")) else "remote")
         clients.append({"ip": ip, "connections": conns, "hostname": host, "via": kind})
     clients.sort(key=lambda c: c["ip"])
+    return clients
+
+
+async def net_clients(_):
+    """GET /mb/net/clients — distinct remote peers with an established connection to
+    the web UI (:443), i.e. who is currently viewing this bridge. Adds reverse-DNS
+    hostname and a LAN/Tailscale/remote classification per client."""
+    clients = await run_blocking(_net_clients_blocking)
     return web.json_response({"ok": True, "count": len(clients), "clients": clients})
 
 
@@ -168,7 +201,7 @@ async def tailscale_peers(_):
     """GET /mb/net/tailscale/peers — connected tailnet peers (hostname, OS, IP,
     online state, and location if the peer advertises one, e.g. exit nodes)."""
     import json as _json
-    rc, out = sh("tailscale", "status", "--json", timeout=10)
+    rc, out = await sh_a("tailscale", "status", "--json", timeout=10)
     if rc != 0:
         return web.json_response({"ok": False, "error": "tailscale not up", "peers": []})
     try:
@@ -217,9 +250,11 @@ async def duckdns_update(request):
     return web.json_response({"ok": ok, "duckdns_response": resp})
 
 
-async def lockdown(request):
-    body = await request.json()
-    on = bool(body.get("on"))
+def _lockdown_blocking(on: bool) -> None:
+    """Up to a dozen iptables spawns plus a config save (which itself remounts the
+    rootfs rw/ro). Offloaded as ONE batch (item 37) — inline, this stalled every
+    client's input for the whole sequence, and a half-applied firewall is worse than
+    a slow one, so the batch must stay coherent in a single thread."""
     sh("iptables", "-N", "MB_LOCKDOWN")
     sh("iptables", "-F", "MB_LOCKDOWN")
     if on:
@@ -235,6 +270,12 @@ async def lockdown(request):
     cfg = load_config("net", {})
     cfg["lockdown"] = on
     save_config("net", cfg)
+
+
+async def lockdown(request):
+    body = await request.json()
+    on = bool(body.get("on"))
+    await run_blocking(_lockdown_blocking, on)
     return web.json_response({"ok": True, "lockdown": on, "note": "SSH (22) never restricted"})
 
 
@@ -270,27 +311,24 @@ def _remove_mac_link(iface):
         _ro()
 
 
-async def mac_spoof(request):
-    import random
-    body = await request.json()
-    iface = body.get("iface", "wlan0")
-    if body.get("clear"):
-        # drop persistence and restore the permanent hardware MAC
-        _remove_mac_link(iface)
-        _rc, perm = sh("bash", "-c", "ethtool -P %s 2>/dev/null | awk '{print $NF}'" % iface)
-        perm = (perm or "").strip()
-        cfg = load_config("net", {}); cfg.pop("mac", None); save_config("net", cfg)
-        if re.match(MAC_RE, perm):
-            sh("ip", "link", "set", iface, "down")
-            sh("ip", "link", "set", iface, "address", perm)
-            sh("ip", "link", "set", iface, "up")
-        return web.json_response({"ok": True, "iface": iface, "cleared": True, "restored_mac": perm or None})
-    if body.get("random"):
-        mac = "02:%02x:%02x:%02x:%02x:%02x" % tuple(random.randint(0, 255) for _ in range(5))
-    else:
-        mac = (body.get("mac") or "").strip().lower()
-    if not re.match(MAC_RE, mac):
-        return web.json_response({"ok": False, "error": "valid mac (aa:bb:cc:dd:ee:ff) or random required"}, status=400)
+def _mac_clear_blocking(iface: str) -> str:
+    """Restore the permanent MAC: ethtool + an interface down/address/up cycle, plus a
+    config save. Offloaded (item 37) — an `ip link set down/up` takes real time and the
+    sequence must not be interleaved."""
+    _remove_mac_link(iface)
+    _rc, perm = sh("bash", "-c", "ethtool -P %s 2>/dev/null | awk '{print $NF}'" % iface)
+    perm = (perm or "").strip()
+    cfg = load_config("net", {}); cfg.pop("mac", None); save_config("net", cfg)
+    if re.match(MAC_RE, perm):
+        sh("ip", "link", "set", iface, "down")
+        sh("ip", "link", "set", iface, "address", perm)
+        sh("ip", "link", "set", iface, "up")
+    return perm
+
+
+def _mac_set_blocking(iface: str, mac: str) -> tuple[int, str]:
+    """Apply a spoofed MAC (down/address/up), persist the .link file and save config —
+    one offloaded batch (item 37); a half-applied MAC change is worse than a slow one."""
     sh("ip", "link", "set", iface, "down")
     rc, out = sh("ip", "link", "set", iface, "address", mac)
     sh("ip", "link", "set", iface, "up")
@@ -298,10 +336,56 @@ async def mac_spoof(request):
     cfg = load_config("net", {})
     cfg["mac"] = {"iface": iface, "mac": mac}
     save_config("net", cfg)
+    return rc, out
+
+
+async def mac_spoof(request):
+    import random
+    body = await request.json()
+    iface = body.get("iface", "wlan0")
+    if body.get("clear"):
+        # drop persistence and restore the permanent hardware MAC
+        perm = await run_blocking(_mac_clear_blocking, iface)
+        return web.json_response({"ok": True, "iface": iface, "cleared": True, "restored_mac": perm or None})
+    if body.get("random"):
+        mac = "02:%02x:%02x:%02x:%02x:%02x" % tuple(random.randint(0, 255) for _ in range(5))
+    else:
+        mac = (body.get("mac") or "").strip().lower()
+    if not re.match(MAC_RE, mac):
+        return web.json_response({"ok": False, "error": "valid mac (aa:bb:cc:dd:ee:ff) or random required"}, status=400)
+    rc, out = await run_blocking(_mac_set_blocking, iface, mac)
     return web.json_response({
         "ok": rc == 0, "iface": iface, "mac": mac, "detail": out[:300],
         "persisted": "systemd-networkd .link file — re-applied at boot",
     })
+
+
+def _tailscale_updown_blocking(action: str) -> tuple[int, str, str | None]:
+    """rw -> tailscale up/down (12-15s) -> ro, as ONE offloaded batch (item 37) so the
+    rw/ro window stays coherent in a single thread instead of freezing the loop.
+
+    tailscaled needs to persist its state to /var/lib/tailscale on login/logout (key
+    material, node state) — the rootfs is read-only outside these brief windows, so
+    unlock for the duration of the action only.
+    """
+    login_url = None
+    _rw()
+    try:
+        if action == "up":
+            # If this node has never authenticated, `tailscale up` prints a login URL
+            # and then blocks waiting for the browser flow — use a short timeout so
+            # sh() falls into its TimeoutExpired branch and hands back the partial
+            # output (which contains the URL) instead of just failing.
+            rc, out = sh("tailscale", "up", "--accept-routes", timeout=12)
+            m = re.search(r"https://login\.tailscale\.com/\S+", out)
+            if m:
+                login_url = m.group(0)
+                rc = 0  # this is the expected first-run state, not a failure
+        else:
+            rc, out = sh("tailscale", "down", timeout=15)
+    finally:
+        _ro()
+    return rc, out, login_url
 
 
 async def tailscale_ctl(request):
@@ -309,29 +393,11 @@ async def tailscale_ctl(request):
     action = body.get("action", "status")
     login_url = None
     if action in ("up", "down"):
-        if sh("bash", "-c", "command -v tailscale")[0] != 0:
+        if sh("bash", "-c", "command -v tailscale")[0] != 0:   # cheap: stays inline
             return web.json_response({"ok": False, "error": "tailscale not installed — run install first"}, status=400)
-        # tailscaled needs to persist its state to /var/lib/tailscale on login/logout
-        # (key material, node state) — the rootfs is read-only outside these brief
-        # windows, so unlock for the duration of the action only.
-        _rw()
-        try:
-            if action == "up":
-                # If this node has never authenticated, `tailscale up` prints a login
-                # URL and then blocks waiting for the browser flow — use a short
-                # timeout so sh() falls into its TimeoutExpired branch and hands back
-                # the partial output (which contains the URL) instead of just failing.
-                rc, out = sh("tailscale", "up", "--accept-routes", timeout=12)
-                m = re.search(r"https://login\.tailscale\.com/\S+", out)
-                if m:
-                    login_url = m.group(0)
-                    rc = 0  # this is the expected first-run state, not a failure
-            else:
-                rc, out = sh("tailscale", "down", timeout=15)
-        finally:
-            _ro()
+        rc, out, login_url = await run_blocking(_tailscale_updown_blocking, action)
     else:
-        rc, out = sh("tailscale", "status", timeout=10)
+        rc, out = await sh_a("tailscale", "status", timeout=10)
     resp = {"ok": rc == 0, "action": action, "detail": out[:1500]}
     if login_url:
         resp["login_url"] = login_url
@@ -383,7 +449,7 @@ async def wifi_connect(request):
             _wifi_write_network(ssid, pw)
         except Exception as e:
             return web.json_response({"ok": False, "error": str(e)}, status=500)
-        sh("systemctl", "restart", "wpa_supplicant@wlan0")
+        await sh_a("systemctl", "restart", "wpa_supplicant@wlan0")
     finally:
         _ro()
     cfg = load_config("net", {}); cfg["wifi"] = {"ssid": ssid}; save_config("net", cfg)
@@ -402,7 +468,7 @@ async def wifi_saved(_):
     except FileNotFoundError:
         pass
     current = None
-    rc, out = sh("iw", "dev", "wlan0", "link", timeout=8)
+    rc, out = await sh_a("iw", "dev", "wlan0", "link", timeout=8)
     m = re.search(r"SSID:\s*(.+)", out)
     if m:
         current = m.group(1).strip()
@@ -457,9 +523,9 @@ async def wol(request):
 async def wifi_scan(_):
     """GET /mb/net/wifi/scan — list nearby SSIDs (wpa_cli on PiKVM, nmcli fallback)."""
     nets = []
-    rc, _o = sh("wpa_cli", "-i", "wlan0", "scan", timeout=6)
+    rc, _o = await sh_a("wpa_cli", "-i", "wlan0", "scan", timeout=6)
     await asyncio.sleep(2)   # was time.sleep(2) — that blocked the whole event loop (bug G)
-    rc, out = sh("wpa_cli", "-i", "wlan0", "scan_results", timeout=8)
+    rc, out = await sh_a("wpa_cli", "-i", "wlan0", "scan_results", timeout=8)
     if rc == 0 and out:
         for line in out.splitlines()[1:]:
             cols = line.split("\t")
@@ -467,7 +533,7 @@ async def wifi_scan(_):
                 nets.append({"ssid": cols[4].strip(), "signal": cols[2].strip(),
                              "secure": "WPA" in cols[3] or "WEP" in cols[3]})
     if not nets:  # NetworkManager fallback
-        rc, out = sh("nmcli", "-t", "-f", "SSID,SIGNAL,SECURITY", "dev", "wifi", "list", timeout=10)
+        rc, out = await sh_a("nmcli", "-t", "-f", "SSID,SIGNAL,SECURITY", "dev", "wifi", "list", timeout=10)
         if rc == 0:
             for line in out.splitlines():
                 p = line.split(":")
@@ -491,7 +557,7 @@ async def update_check(_):
     # safe.directory inline, NOT `git config --global`: /root is on the read-only
     # rootfs so the global write always failed (noisy `$HOME not set` / RO-fs error),
     # and root owns the repo so no dubious-ownership check even fires.
-    sh("bash", "-c", "cd /opt/magicbridge && git -c safe.directory=/opt/magicbridge fetch origin main 2>&1", timeout=30)
+    await sh_a("bash", "-c", "cd /opt/magicbridge && git -c safe.directory=/opt/magicbridge fetch origin main 2>&1", timeout=30)
     _ro()
     _rc, cur = sh("bash", "-c", "git -C /opt/magicbridge rev-parse --short HEAD 2>/dev/null")
     _rc, origin = sh("bash", "-c", "git -C /opt/magicbridge rev-parse origin/main 2>/dev/null")
@@ -534,7 +600,7 @@ async def logs_tail(request):
     args = ["journalctl", "-n", n, "--no-pager", "-o", "short-iso"]
     if unit in ("kvmd", "kvmd-nginx", "magicbridge-net", "magicbridge-stealth", "magicbridge-agent"):
         args += ["-u", unit]
-    rc, out = sh(*args, timeout=12)
+    rc, out = await sh_a(*args, timeout=12)
     return web.json_response({"ok": rc == 0, "unit": unit or "all", "text": out[-8000:]})
 
 
@@ -615,10 +681,10 @@ def _deploy_structural() -> bool:
 # ---- EDID editor (kvmd-edidconf) -----------------------------------
 async def edid_get(_):
     import re
-    _rc, help_txt = sh("kvmd-edidconf", "--help", timeout=10)
+    _rc, help_txt = await sh_a("kvmd-edidconf", "--help", timeout=10)
     m = re.search(r"--import-preset \{([^}]+)\}", help_txt)
     presets = [p.strip() for p in m.group(1).split("|")] if m else []
-    _rc, cur = sh("kvmd-edidconf", timeout=10)
+    _rc, cur = await sh_a("kvmd-edidconf", timeout=10)
     return web.json_response({"ok": True, "presets": presets, "current": cur[-2000:]})
 
 
@@ -629,7 +695,7 @@ async def edid_apply(request):
         return web.json_response({"ok": False, "error": "preset required"}, status=400)
     _rw()
     try:
-        rc, out = sh("kvmd-edidconf", "--import-preset", preset, "--apply", timeout=40)
+        rc, out = await sh_a("kvmd-edidconf", "--import-preset", preset, "--apply", timeout=40)
     finally:
         _ro()
     return web.json_response({"ok": rc == 0, "preset": preset, "detail": out[-1500:]})
@@ -654,7 +720,7 @@ MONITORS = {
 
 
 async def monitor_get(_):
-    rc, cur = sh("kvmd-edidconf", timeout=10)
+    rc, cur = await sh_a("kvmd-edidconf", timeout=10)
     return web.json_response({"ok": True,
         "monitors": {k: {"label": v["label"], "mfc": v["mfc"], "name": v["name"]} for k, v in MONITORS.items()},
         "current": cur[-1500:]})
@@ -674,6 +740,19 @@ def _realistic_monitor_serial(mfc):
     return (fmt.get(mfc) or (a + d))[:13]
 
 
+def _edid_write_blocking(mfc, name, product, serial, mon_serial) -> tuple[int, str]:
+    """rw -> kvmd-edidconf --apply (up to 45s over i2c) -> ro, offloaded as one batch
+    (item 37). This writes the monitor identity the TARGET reads, so it must complete
+    as a unit; inline it froze all input for the whole EDID write."""
+    _rw()
+    try:
+        return sh("kvmd-edidconf", "--set-mfc-id", mfc, "--set-monitor-name", name,
+                  "--set-product-id", str(product), "--set-serial", str(serial),
+                  "--set-monitor-serial", mon_serial, "--apply", timeout=45)
+    finally:
+        _ro()
+
+
 async def monitor_set(request):
     import random
     body = await request.json()
@@ -686,13 +765,7 @@ async def monitor_set(request):
         product = int(str(body.get("product") or "4097"), 0)
     serial = random.randint(1000000, 99999999)
     mon_serial = _realistic_monitor_serial(mfc)   # ASCII DTD serial — replaces "CAFEBABE"
-    _rw()
-    try:
-        rc, out = sh("kvmd-edidconf", "--set-mfc-id", mfc, "--set-monitor-name", name,
-                     "--set-product-id", str(product), "--set-serial", str(serial),
-                     "--set-monitor-serial", mon_serial, "--apply", timeout=45)
-    finally:
-        _ro()
+    rc, out = await run_blocking(_edid_write_blocking, mfc, name, product, serial, mon_serial)
     return web.json_response({"ok": rc == 0,
                               "applied": {"mfc": mfc, "name": name, "product": product,
                                           "serial": serial, "monitor_serial": mon_serial},
@@ -730,9 +803,9 @@ async def vnc_set(request):
                 pass
             except Exception as e:
                 log.warning("vnc enable symlink: %s", e)
-            rc, out = sh("systemctl", "start", "kvmd-vnc", timeout=25)
+            rc, out = await sh_a("systemctl", "start", "kvmd-vnc", timeout=25)
         else:
-            rc, out = sh("systemctl", "stop", "kvmd-vnc", timeout=25)
+            rc, out = await sh_a("systemctl", "stop", "kvmd-vnc", timeout=25)
             try:
                 if os.path.islink(VNC_WANTS):
                     os.remove(VNC_WANTS)
@@ -806,30 +879,45 @@ async def totp_disable(_):
 
 
 # ---- Tailscale install + Funnel ------------------------------------
-async def tailscale_install(_):
-    # PiKVM's rootfs is read-only by default. pacman needs to write to /var/lib/pacman
-    # and /usr, and `systemctl enable` needs to write a unit symlink under /etc — both
-    # fail silently-ish (non-zero rc, swallowed by the button) unless we unlock first.
+def _tailscale_install_blocking() -> tuple[bool, str, bool]:
+    """The whole install sequence, run in ONE executor thread (item 37).
+
+    PiKVM's rootfs is read-only by default. pacman needs to write to /var/lib/pacman
+    and /usr, and `systemctl enable` needs to write a unit symlink under /etc — both
+    fail silently-ish (non-zero rc, swallowed by the button) unless we unlock first.
+
+    This is the worst blocker in the service: pacman (120s) plus a curl|sh fallback
+    (180s) is up to ~5 minutes. Inline on the event loop that froze EVERY connected
+    client's keyboard, mouse and status polling for the entire install.
+    Returns (ok, detail, already_installed).
+    """
     already = sh("bash", "-c", "command -v tailscale")[0] == 0
     if already and sh("systemctl", "is-enabled", "tailscaled")[0] == 0:
-        return web.json_response({"ok": True, "already": True, "detail": "tailscale already installed"})
+        return True, "tailscale already installed", True
     _rw()
     try:
         out = ""
         if not already:
             rc, out = sh("bash", "-c", "pacman -Sy --noconfirm tailscale 2>&1", timeout=120)
             if rc != 0:
-                rc, out2 = sh("bash", "-c", "curl -fsSL https://tailscale.com/install.sh | sh 2>&1", timeout=180)
+                _rc2, out2 = sh("bash", "-c", "curl -fsSL https://tailscale.com/install.sh | sh 2>&1", timeout=180)
                 out += "\n" + out2
         # PiKVM-specific fixes package, best-effort (not fatal if missing from the repos)
         sh("bash", "-c", "pacman -Sy --noconfirm tailscale-pikvm 2>&1", timeout=60)
-        rc_en, out_en = sh("systemctl", "enable", "--now", "tailscaled", timeout=20)
+        _rc_en, out_en = sh("systemctl", "enable", "--now", "tailscaled", timeout=20)
         out += "\n" + out_en
     finally:
         _ro()
     ok = (sh("bash", "-c", "command -v tailscale")[0] == 0
           and sh("systemctl", "is-active", "tailscaled")[0] == 0)
-    return web.json_response({"ok": ok, "detail": out[-1800:]})
+    return ok, out, False
+
+
+async def tailscale_install(_):
+    ok, detail, already = await run_blocking(_tailscale_install_blocking)
+    if already:
+        return web.json_response({"ok": True, "already": True, "detail": detail})
+    return web.json_response({"ok": ok, "detail": detail[-1800:]})
 
 
 async def tailscale_funnel(request):
@@ -838,13 +926,13 @@ async def tailscale_funnel(request):
     if sh("bash", "-c", "command -v tailscale")[0] != 0:
         return web.json_response({"ok": False, "error": "tailscale not installed — run install first"}, status=400)
     if on:
-        rc, out = sh("tailscale", "funnel", "--bg", "443", timeout=30)
+        rc, out = await sh_a("tailscale", "funnel", "--bg", "443", timeout=30)
         if rc != 0:
-            rc, out = sh("tailscale", "funnel", "443", "on", timeout=30)
+            rc, out = await sh_a("tailscale", "funnel", "443", "on", timeout=30)
     else:
-        rc, out = sh("tailscale", "funnel", "--https=443", "off", timeout=30)
+        rc, out = await sh_a("tailscale", "funnel", "--https=443", "off", timeout=30)
         if rc != 0:
-            rc, out = sh("tailscale", "funnel", "443", "off", timeout=30)
+            rc, out = await sh_a("tailscale", "funnel", "443", "off", timeout=30)
     return web.json_response({"ok": rc == 0, "on": on, "detail": out[-1500:]})
 
 
@@ -876,15 +964,12 @@ async def led_set(request):
     return web.json_response({"ok": rc == 0, "on": on, "led": d.split("/")[-1]})
 
 
-async def update_apply(_):
-    """POST /mb/net/update/apply — git-based self-update of /opt/magicbridge + restart sidecars."""
-    oled = None
-    start = time.monotonic()
-    try:
-        oled = subprocess.Popen(["/usr/local/bin/mb-oled-msg", "--updating"])  # OLED "Updating..." (handoff #19)
-    except Exception:
-        oled = None
-    prev = _read_stamp()          # what was fully deployed before this apply
+def _update_deploy_blocking(prev: str) -> tuple[int, str, bool, bool]:
+    """rw -> git fetch+reset (up to 90s) -> structural install (up to 60s) -> stamp -> ro.
+    One offloaded batch (item 37): this is the longest operation the service performs,
+    and inline it froze every client's keyboard/mouse for the whole update. The rw/ro
+    window must also stay coherent in a single thread.
+    Returns (rc, out, structural_needed, structural_ok)."""
     rc, out, struct, struct_ok = 1, "", False, True
     _rw()
     try:
@@ -912,7 +997,20 @@ async def update_apply(_):
                 _write_stamp(_head_sha())
     finally:
         _ro()
-    sh("systemctl", "reload", "kvmd-nginx", timeout=15)
+    return rc, out, struct, struct_ok
+
+
+async def update_apply(_):
+    """POST /mb/net/update/apply — git-based self-update of /opt/magicbridge + restart sidecars."""
+    oled = None
+    start = time.monotonic()
+    try:
+        oled = subprocess.Popen(["/usr/local/bin/mb-oled-msg", "--updating"])  # OLED "Updating..." (handoff #19)
+    except Exception:
+        oled = None
+    prev = _read_stamp()          # what was fully deployed before this apply
+    rc, out, struct, struct_ok = await run_blocking(_update_deploy_blocking, prev)
+    await sh_a("systemctl", "reload", "kvmd-nginx", timeout=15)
     # A tiny pull (e.g. a one-file VERSION bump) finishes in <1s, but kvmd-oled
     # needs ~2s just to paint one frame — so without a floor the "Updating..."
     # animation is killed before it ever appears. Hold the display long enough
@@ -929,10 +1027,10 @@ async def update_apply(_):
             oled.terminate()
         except Exception:
             pass
-    sh("bash", "-c", "/usr/local/bin/mb-oled-msg --resume")
+    await sh_a("bash", "-c", "/usr/local/bin/mb-oled-msg --resume")
     # Restart sidecars last; magicbridge-net restart ends this request.
     for svc in ("magicbridge-stealth", "magicbridge-agent", "magicbridge-net"):
-        sh("systemctl", "restart", svc, timeout=15)
+        await sh_a("systemctl", "restart", svc, timeout=15)
     return web.json_response({"ok": rc == 0 and struct_ok, "structural": struct,
                               "structural_ok": struct_ok, "detail": out[-1500:]})
 
