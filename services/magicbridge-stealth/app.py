@@ -165,24 +165,113 @@ _OTG_TEARDOWN = (
 ) % _GADGET
 
 
+def _gadget_udc_bound() -> bool:
+    """True when the gadget is actually bound to a UDC — i.e. the TARGET currently
+    sees a device. An empty UDC means the target has no keyboard/mouse at all."""
+    try:
+        return bool(open(_GADGET + "/UDC").read().strip())
+    except Exception:
+        return False
+
+
+def _live_gadget_strings() -> dict:
+    """What the TARGET actually enumerates right now, straight from configfs — the
+    single source of truth (item 39). Never infer this from our own config."""
+    def _r(p):
+        try:
+            return open(p).read().strip()
+        except Exception:
+            return ""
+    s = _GADGET + "/strings/0x409/"
+    return {
+        "vendor_id": _r(_GADGET + "/idVendor"),
+        "product_id": _r(_GADGET + "/idProduct"),
+        "manufacturer": _r(s + "manufacturer"),
+        "product": _r(s + "product"),
+        "serial": _r(s + "serialnumber"),
+        "udc_bound": _gadget_udc_bound(),
+    }
+
+
+def verify_identity(ident: dict) -> tuple[bool, dict, list]:
+    """Read the live gadget back and confirm it matches what we asked for (item 39).
+
+    `systemctl start kvmd-otg` returning 0 does NOT prove the target enumerates OUR
+    identity — the override could be ignored, overridden, or the gadget left unbound.
+    Reporting 'applied' in that case is a silent stealth mismatch: the operator
+    believes the device looks like a Logitech receiver while the target still sees
+    the old one. Compare against the SANITIZED values, since those are what actually
+    reach the YAML.
+    """
+    live = _live_gadget_strings()
+    want = {
+        "manufacturer": _clean_usb_str(ident.get("manufacturer"), "Logitech"),
+        "product": _clean_usb_str(ident.get("product"), "USB Receiver"),
+        "serial": _clean_usb_str(ident.get("serial")),
+    }
+    mismatches = []
+    for k, w in want.items():
+        if w and live.get(k, "") != w:
+            mismatches.append({"field": k, "wanted": w, "live": live.get(k, "")})
+    for k, w in (("vendor_id", ident.get("vendor_id")), ("product_id", ident.get("product_id"))):
+        if isinstance(w, int):
+            got = (live.get(k) or "").lower()
+            if got and got not in ("0x%04x" % w, "%04x" % w):
+                mismatches.append({"field": k, "wanted": "0x%04X" % w, "live": live.get(k, "")})
+    if not live.get("udc_bound"):
+        mismatches.append({"field": "udc", "wanted": "bound", "live": "UNBOUND — target sees no device"})
+    return (not mismatches), live, mismatches
+
+
 def rebuild_gadget() -> tuple[bool, str]:
     # kvmd-otg can't create the gadget on top of a running/leftover one, and its
     # own `stop` doesn't reliably remove the configfs gadget or /run/kvmd/otg — so
     # we tear BOTH down ourselves, then start fresh. This is what makes live USB
     # identity spoofing actually apply (a plain restart errors FileExists).
-    _sh("systemctl", "reset-failed", "kvmd-otg")
-    _sh("systemctl", "stop", "kvmd-otg", timeout=20)
-    time.sleep(1)
-    _sh("bash", "-c", _OTG_TEARDOWN)
-    _sh("systemctl", "reset-failed", "kvmd-otg")
-    rc, out = _sh("systemctl", "start", "kvmd-otg", timeout=25)
-    if rc != 0:  # never leave the gadget down — clean once more + retry
+    rc, out = 1, ""
+    try:
+        _sh("systemctl", "reset-failed", "kvmd-otg")
+        _sh("systemctl", "stop", "kvmd-otg", timeout=20)
+        time.sleep(1)
         _sh("bash", "-c", _OTG_TEARDOWN)
         _sh("systemctl", "reset-failed", "kvmd-otg")
         rc, out = _sh("systemctl", "start", "kvmd-otg", timeout=25)
-    if rc == 0:
-        _sh("systemctl", "try-restart", "kvmd")
+        if rc != 0:  # never leave the gadget down — clean once more + retry
+            _sh("bash", "-c", _OTG_TEARDOWN)
+            _sh("systemctl", "reset-failed", "kvmd-otg")
+            rc, out = _sh("systemctl", "start", "kvmd-otg", timeout=25)
+        if rc == 0:
+            _sh("systemctl", "try-restart", "kvmd")
+    finally:
+        # ITEM 39: we tore the gadget down above. If anything went wrong between the
+        # teardown and a successful start — a failed unit, an exception, a timeout —
+        # the target is left with NO keyboard and NO mouse. Guarantee a last-ditch
+        # reattach on every exit path rather than only on the rc != 0 branch.
+        if not _gadget_udc_bound():
+            log.error("USB gadget left UNBOUND after rebuild — attempting recovery")
+            _sh("bash", "-c", _OTG_TEARDOWN)
+            _sh("systemctl", "reset-failed", "kvmd-otg")
+            _rc_r, out_r = _sh("systemctl", "start", "kvmd-otg", timeout=25)
+            if _gadget_udc_bound():
+                log.warning("USB gadget recovered — target has input again")
+            else:
+                log.error("USB gadget STILL unbound after recovery: %s", out_r[:300])
     return rc == 0, out
+
+def apply_identity(ident: dict, hide_msd: bool) -> tuple[bool, str, bool, dict, list]:
+    """Write the override, rebuild the gadget, then READ IT BACK and verify (item 39).
+
+    One executor hop for the whole sequence (also item 37). Returns
+    (service_started_ok, detail, verified, live_strings, mismatches).
+    """
+    write_otg_override(ident, hide_msd)
+    ok, out = rebuild_gadget()
+    verified, live, mismatches = verify_identity(ident)
+    if not verified:
+        log.error("USB identity NOT verified after rebuild — target may still enumerate "
+                  "the OLD device. mismatches=%s", mismatches)
+    return ok, out, verified, live, mismatches
+
 
 def current_identity() -> dict:
     return load_config("stealth", {
@@ -332,12 +421,13 @@ async def set_identity(request: web.Request):
 
     loop = asyncio.get_running_loop()
     try:
-        await loop.run_in_executor(None, write_otg_override, ident, ident.get("safe_mode", False))
-        ok, out = await loop.run_in_executor(None, rebuild_gadget)
+        ok, out, verified, live, mismatches = await loop.run_in_executor(
+            None, apply_identity, ident, ident.get("safe_mode", False))
     except Exception as e:
         return web.json_response({"ok": False, "error": f"gadget apply failed: {e}"}, status=200)
     save_config("stealth", ident)
-    return web.json_response({"ok": ok, "applied": ident, "detail": out[:1000]})
+    return web.json_response({"ok": ok and verified, "verified": verified, "applied": ident,
+                              "live": live, "mismatches": mismatches, "detail": out[:1000]})
 
 async def random_serial(request: web.Request):
     try:
@@ -349,12 +439,14 @@ async def random_serial(request: web.Request):
     cur = current_identity(); cur["serial"] = rand_serial()
     loop = asyncio.get_running_loop()
     try:
-        await loop.run_in_executor(None, write_otg_override, cur, cur.get("safe_mode", False))
-        ok, out = await loop.run_in_executor(None, rebuild_gadget)
+        ok, out, verified, live, mismatches = await loop.run_in_executor(
+            None, apply_identity, cur, cur.get("safe_mode", False))
     except Exception as e:
         return web.json_response({"ok": False, "error": f"gadget apply failed: {e}"}, status=200)
     save_config("stealth", cur)
-    return web.json_response({"ok": ok, "serial": cur["serial"], "detail": out[:500]})
+    return web.json_response({"ok": ok and verified, "verified": verified,
+                              "serial": cur["serial"], "live": live,
+                              "mismatches": mismatches, "detail": out[:500]})
 
 RANDOM_VENDORS = [("0x046d", "Logitech"), ("0x045e", "Microsoft"), ("0x413c", "Dell"),
                   ("0x1bcf", "Sunplus"), ("0x0951", "Kingston"), ("0x30fa", "Generic"),
@@ -380,12 +472,13 @@ async def randomize(request: web.Request):
     }
     loop = asyncio.get_running_loop()
     try:
-        await loop.run_in_executor(None, write_otg_override, ident, ident.get("safe_mode", False))
-        ok, out = await loop.run_in_executor(None, rebuild_gadget)
+        ok, out, verified, live, mismatches = await loop.run_in_executor(
+            None, apply_identity, ident, ident.get("safe_mode", False))
     except Exception as e:
         return web.json_response({"ok": False, "error": f"gadget apply failed: {e}"}, status=200)
     save_config("stealth", ident)
-    return web.json_response({"ok": ok, "applied": ident, "detail": out[:500]})
+    return web.json_response({"ok": ok and verified, "verified": verified, "applied": ident,
+                              "live": live, "mismatches": mismatches, "detail": out[:500]})
 
 
 async def backup(_):
@@ -423,13 +516,14 @@ async def safe_mode(request: web.Request):
     cur = current_identity(); cur["safe_mode"] = on
     loop = asyncio.get_running_loop()
     try:
-        await loop.run_in_executor(None, write_otg_override, cur, on)
-        ok, out = await loop.run_in_executor(None, rebuild_gadget)
+        ok, out, verified, live, mismatches = await loop.run_in_executor(
+            None, apply_identity, cur, on)
     except Exception as e:
         return web.json_response({"ok": False, "error": f"gadget apply failed: {e}"}, status=200)
     save_config("stealth", cur)
     return web.json_response({
-        "ok": ok, "safe_mode": on,
+        "ok": ok and verified, "verified": verified, "safe_mode": on,
+        "live": live, "mismatches": mismatches,
         "note": ("MSD interface hidden — virtual media is off until safe-mode is disabled"
                  if on else "MSD interface restored — virtual media available"),
         "detail": out[:500]})
