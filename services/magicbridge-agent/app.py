@@ -181,6 +181,8 @@ async def list_macros(_):
     return web.json_response({"macros": load_config("macros", {}).get("items", [])})
 
 async def save_macro(request: web.Request):
+    if not agent_enabled():
+        return web.json_response({"ok": False, "error": "agent disabled"}, status=403)
     body = await request.json()
     m = load_config("macros", {}); m.setdefault("items", [])
     m["items"] = [x for x in m["items"] if x.get("name") != body.get("name")]
@@ -189,6 +191,8 @@ async def save_macro(request: web.Request):
     return web.json_response({"ok": True, "count": len(m["items"])})
 
 async def run_macro(request: web.Request):
+    if not agent_enabled():
+        return web.json_response({"ok": False, "error": "agent disabled"}, status=403)
     body = await request.json()
     m = load_config("macros", {}).get("items", [])
     macro = next((x for x in m if x.get("name") == body.get("name")), None)
