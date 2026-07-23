@@ -963,16 +963,14 @@ body:not(.fs) .fs-hud{display:none!important}
         <div class="sys-cat" data-cat="peripherals">
         <div class="scard">
           <div class="scard-title"><span class="dot-yel" style="background:var(--green)"></span>Mouse Jiggler</div>
-          <div class="snote" style="margin-bottom:8px">Keeps the target awake with occasional random mouse nudges. Pauses while you're using the KVM.</div>
+          <div class="snote" style="margin-bottom:8px">Nudges the mouse on a timer so the target never sleeps. Pauses automatically while you're actively controlling the KVM.</div>
           <div class="srow"><span class="sk">Status</span><span class="sv" id="jiggler-status">-</span></div>
-          <label class="wifi-label" for="jiggler-style" style="margin-top:8px">Style</label>
-          <select class="sinput wifi-field" id="jiggler-style" onchange="jigglerStyleChanged()" style="margin-bottom:8px">
-            <option value="minimal">Minimal - stays usable while enabled</option>
-            <option value="slow">Slow &amp; subtle</option>
-            <option value="moderate" selected>Moderate</option>
-            <option value="fast">Fast &amp; obvious</option>
-          </select>
-          <button class="sbtn" id="jiggler-btn" onclick="toggleJiggler()">Enable Jiggler</button>
+          <label class="wifi-label" for="jiggler-interval" style="margin-top:8px">Move the mouse every (seconds)</label>
+          <input class="sinput wifi-field" id="jiggler-interval" type="number" min="5" max="3600" value="60" onchange="jigglerIntervalChanged()" style="margin-bottom:8px">
+          <div style="display:flex;gap:6px;align-items:stretch">
+            <button class="sbtn" id="jiggler-btn" onclick="toggleJiggler()" style="flex:1">Enable Jiggler</button>
+            <button class="sbtn" onclick="refreshJigglerStatus()" title="Re-check status" style="flex:0 0 auto;min-width:38px">↻</button>
+          </div>
           <div id="jiggler-msg" style="display:none;margin-top:8px;font-size:10px;padding:4px 6px;border-radius:4px"></div>
         </div>
         <div class="scard">
@@ -1270,7 +1268,14 @@ body:not(.fs) .fs-hud{display:none!important}
       return J({ok:false});
     }
     if(path==='/api/identity'){const s=await g('/mb/stealth/identity');const c=(s&&s.current)||{};
-      return J({product:c.product,manufacturer:c.manufacturer,serial:c.serial,vid:hex(c.vendor_id),pid:hex(c.product_id)});}
+      // Also surface the MONITOR identity (the target reads it too). kvmd-edidconf's
+      // text is parsed here so the Devices tab's "How the target sees it" monitor card
+      // isn't left blank (it used to have no data source at all).
+      const mon=await g('/mb/net/monitor'); let mn='',mm='',ms='';
+      if(mon&&mon.current){const t=mon.current,gm=(re)=>{const x=t.match(re);return x?x[1].trim():'';};
+        mn=gm(/Monitor name:\s*(.+)/);mm=gm(/Manufacturer ID:\s*(.+)/);ms=gm(/Monitor serial:\s*(.+)/);}
+      return J({product:c.product,manufacturer:c.manufacturer,serial:c.serial,vid:hex(c.vendor_id),pid:hex(c.product_id),
+                monitor_name:mn,monitor_mfr:mm,monitor_serial:ms});}
     if(path==='/api/power'){const r=await p('/api/atx/power?action='+encodeURIComponent(b.action||''));return J({ok:!!(r&&r.ok!==false)});}
     if(path==='/api/jiggler'){
       if(m==='GET'){const s=await g('/api/hid');const j=(s&&s.result&&s.result.jiggler)||{};return J({enabled:!!j.enabled,interval:j.interval||60});}
@@ -2415,6 +2420,9 @@ async function identityRefresh(){
     const set=(id,v)=>{const e=document.getElementById(id);if(e)e.textContent=v||'-';};
     set('id-prod',d.product);set('id-mfr',d.manufacturer);set('id-ser',d.serial);
     set('id-ids',(d.vid||'-')+' / '+(d.pid||'-'));
+    // Monitor card ("How the target sees it") — the EDID identity the target reads.
+    const mfrName={DEL:'Dell',GSM:'LG',SAM:'Samsung',HWP:'HP',ACR:'Acer',AUO:'AU Optronics',BNQ:'BenQ'};
+    set('disp-name',d.monitor_name);set('disp-mfr',mfrName[d.monitor_mfr]||d.monitor_mfr);set('disp-ser',d.monitor_serial);
     function dd(id,orig,curr){const e=document.getElementById(id);if(!e)return;e.textContent=curr||'-';e.className=curr===orig?'id-same':'id-curr';}
     dd('dd-prod',_ORIG.prod,d.product);dd('dd-mfr',_ORIG.mfr,d.manufacturer);
     // Real Logitech Unifying Receivers report no serial number at all, so
@@ -2642,20 +2650,23 @@ async function refreshJigglerStatus(){
     const d=await r.json();
     const s=document.getElementById('jiggler-status');
     const b=document.getElementById('jiggler-btn');
-    const sel=document.getElementById('jiggler-style');
-    if(d.style) sel.value=d.style;
+    const iv=document.getElementById('jiggler-interval');
+    // Reflect the LIVE interval kvmd reports (unless the user is mid-edit of the field).
+    if(d.interval && document.activeElement!==iv) iv.value=d.interval;
     if(d.enabled){
-      s.textContent='ON ('+(sel.options[sel.selectedIndex]?.text||d.style)+')'; s.className='sv ok';
+      s.textContent='ON — moves every '+(d.interval||'?')+'s'; s.className='sv ok';
       b.textContent='Disable Jiggler';
     }else{
       s.textContent='OFF'; s.className='sv';
       b.textContent='Enable Jiggler';
     }
     b.dataset.enabled=d.enabled?'1':'0';
-  }catch(e){}
+  }catch(e){ const s=document.getElementById('jiggler-status'); if(s){s.textContent='unreachable'; s.className='sv err';} }
 }
 async function _setJiggler(enabled){
-  const sel=document.getElementById('jiggler-style');
+  const iv=document.getElementById('jiggler-interval');
+  const interval=Math.max(5,Math.min(3600,parseInt(iv.value)||60));
+  iv.value=interval;
   const msg=document.getElementById('jiggler-msg');
   const show=(text,ok)=>{
     msg.textContent=text;
@@ -2665,10 +2676,10 @@ async function _setJiggler(enabled){
   };
   try{
     const r=await fetch('/api/jiggler',{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({enabled:enabled,style:sel.value})});
+      body:JSON.stringify({enabled:enabled,interval:interval})});
     const d=await r.json();
     if(d.ok){
-      show(enabled?'✓ Jiggler enabled ('+sel.value+')':'✓ Jiggler disabled', true);
+      show(enabled?('✓ Jiggler ON — every '+interval+'s'):'✓ Jiggler disabled', true);
       toast(enabled?'Jiggler enabled ✓':'Jiggler disabled ✓');
       refreshJigglerStatus();
     }else{
@@ -2680,13 +2691,12 @@ function toggleJiggler(){
   const b=document.getElementById('jiggler-btn');
   _setJiggler(b.dataset.enabled!=='1');
 }
-function jigglerStyleChanged(){
+// Changing the interval while the jiggler is ON re-applies it live; while OFF it just
+// stages the value for when you enable it.
+function jigglerIntervalChanged(){
   const b=document.getElementById('jiggler-btn');
-  // Only push the style change live if the jiggler is currently on;
-  // if it's off, just remember the selection for next time it's enabled.
-  if(b.dataset.enabled==='1') _setJiggler(true);
+  if(b && b.dataset.enabled==='1') _setJiggler(true);
 }
-
 // HID connect-only-during-active-use
 async function refreshHidAutoDcStatus(){
   try{
