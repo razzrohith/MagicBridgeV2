@@ -23,6 +23,15 @@ kvmd:
             jiggler:
                 enabled: false
 
+    # Virtual media (USB mass-storage) is PERMANENTLY DISABLED by requirement: the
+    # target must see ONLY monitor + keyboard + mouse (+ consumer media keys). A real
+    # Logitech USB Receiver has NO drive, so a USB mass-storage interface is a stealth
+    # tell. kvmd-otg only builds mass_storage.usb0 when msd.type == "otg", so
+    # "disabled" removes it from the gadget entirely — independent of the Stealth
+    # panel's Safe-mode toggle. (Re-enable here only if you ever need virtual media.)
+    msd:
+        type: disabled
+
 # Default USB gadget identity the TARGET sees over USB — present a real Logitech
 # Unifying Receiver instead of kvmd's default "PiKVM Composite Device" tell.
 # (Applied cleanly when kvmd-otg starts fresh, e.g. on boot; the Stealth panel
