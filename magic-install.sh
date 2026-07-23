@@ -178,6 +178,12 @@ phase4_services() {
     [ -e "$unit" ] || continue
     run "install -Dm644 '$unit' \"/etc/systemd/system/$(basename "$unit")\""
   done
+  # Drop-in for upstream tailscaled: put its state on the writable PST partition
+  # (rootfs is read-only, so the default state dir fails). Harmless before tailscale
+  # is installed; picked up automatically when it is.
+  if [ -f "$INSTALL_ROOT/systemd/tailscaled.service.d/10-mb-pst-state.conf" ]; then
+    run "install -Dm644 '$INSTALL_ROOT/systemd/tailscaled.service.d/10-mb-pst-state.conf' /etc/systemd/system/tailscaled.service.d/10-mb-pst-state.conf"
+  fi
   run "systemctl daemon-reload"
   ok "services + units installed"
 }

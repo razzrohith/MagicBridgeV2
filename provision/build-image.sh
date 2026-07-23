@@ -260,6 +260,11 @@ if [[ -d "$R/opt/magicbridge/systemd" ]]; then
         [[ -e "$u" ]] || continue
         install -Dm644 "$u" "$R/etc/systemd/system/$(basename "$u")"; _n=$((_n+1))
     done
+    # tailscaled PST-state drop-in (rootfs is RO; state lives on the PST partition).
+    if [[ -f "$R/opt/magicbridge/systemd/tailscaled.service.d/10-mb-pst-state.conf" ]]; then
+        install -Dm644 "$R/opt/magicbridge/systemd/tailscaled.service.d/10-mb-pst-state.conf" \
+            "$R/etc/systemd/system/tailscaled.service.d/10-mb-pst-state.conf"
+    fi
     ok "re-deployed all $_n repo unit files (item 27: no stale .service ships)"
 fi
 # ITEM 31: stamp the fully-deployed commit so a freshly-flashed unit reports
