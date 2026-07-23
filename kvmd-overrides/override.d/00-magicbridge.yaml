@@ -7,8 +7,15 @@ kvmd:
     streamer:
         h264_bitrate:
             default: 5000
+        # desired_fps MUST be a clean integer divisor of the source refresh (60 Hz
+        # here) or ustreamer decimates unevenly (60->40 = a 3:2 keep/drop pattern),
+        # producing irregular frame spacing. WebRTC reacts to that jitter by growing
+        # the playout buffer (→ ~500 ms latency) and counting late frames as loss
+        # (→ phantom 20-30% "packet loss" the browser reports while ICMP shows 0%),
+        # which then triggers a keyframe storm and stutter. 40 was the regression vs
+        # stock PiKVM on identical hardware. 30 = a smooth 2:1 decimation of 60 Hz.
         desired_fps:
-            default: 40
+            default: 30
 
     # Mouse jiggler available (kvmd native) — off by default, user toggles in UI.
     hid:

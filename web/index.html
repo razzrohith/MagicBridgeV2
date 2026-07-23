@@ -1291,8 +1291,14 @@ body:not(.fs) .fs-hud{display:none!important}
       if(m==='GET'){const s=await g('/api/hid');const abs=!!(s&&s.result&&s.result.mouse&&s.result.mouse.absolute);return J({mode:abs?'absolute':'relative'});}
       const r=await p('/api/hid/set_params?mouse_output='+(b.mode==='absolute'?'usb':'usb_rel'));return J({ok:!!(r&&r.ok!==false),mode:b.mode,rebuilt:true});}
     if(path==='/api/stream/settings'){
-      let qs='quality='+(b.quality||80)+'&desired_fps='+(b.fps||30);if(b.resolution)qs+='&resolution='+encodeURIComponent(b.resolution);
-      const r=await p('/api/streamer/set_params?'+qs);return J({ok:!!(r&&r.ok!==false)});}
+      const base='quality='+(b.quality||80)+'&desired_fps='+(b.fps||30);
+      // This capture is SOURCE-driven and rejects a `resolution` param with
+      // StreamerResolutionNotSupported (HTTP 400) — which used to fail the WHOLE
+      // Apply every time. Try with resolution, then retry without it so Apply
+      // still applies quality+fps. (Resolution is set on the source, not here.)
+      let r=await p('/api/streamer/set_params?'+base+(b.resolution?'&resolution='+encodeURIComponent(b.resolution):''));
+      if(r && r.ok===false && b.resolution) r=await p('/api/streamer/set_params?'+base);
+      return J({ok:!!(r&&r.ok!==false)});}
     if(path.startsWith('/api/oled')||path.startsWith('/api/wol')||path==='/api/hid-autodisconnect'||path==='/api/keyboard/settings')
       return J({ok:false,enabled:false,disabled:true});
     if(path==='/api/auth/change-password') return J({ok:false,error:'use the device console'});
@@ -1908,6 +1914,10 @@ function setVideoTransport(mode){
   const vid = document.getElementById('webrtc-view');
   if(mode === 'h264'){
     img.style.display = 'none';
+    // Stop the MJPEG <img> pulling frames while WebRTC is active — otherwise
+    // ustreamer encodes MJPEG *and* H.264 off the same capture at once, doubling
+    // encoder load and starving the H.264 path. (Fallback re-sets src via retryStream.)
+    try{ img.removeAttribute('src'); }catch(e){}
     vid.style.display = '';
     startWebRTC();
     startWebrtcStats();
@@ -1963,6 +1973,12 @@ function startWebRTC(){
   Janus.init({debug: false, dependencies: Janus.useDefaultDependencies(), callback: function(){
     _janus = new Janus({
       server: (location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/janus/ws',
+      // LAN-direct: viewer and Pi are on the same network, so use ONLY host
+      // candidates. Without this, janus.js falls back to Google's public STUN
+      // (stun.l.google.com) on every connect — which adds ICE setup delay (and can
+      // stall for seconds on an offline/stealth unit until the 12s timeout drops us
+      // to MJPEG), and phones an external server on each video start (anonymity leak).
+      iceServers: [],
       success: function(){
         _janus.attach({
           plugin: 'janus.plugin.ustreamer',
