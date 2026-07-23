@@ -606,6 +606,7 @@ body:not(.fs) .fs-hud{display:none!important}
           <div class="srow"><span class="sk">Status</span><span class="sv" id="s-stream">-</span></div>
           <div class="srow"><span class="sk">Ping</span><span class="sv ac" id="s-lat">-</span></div>
           <div class="srow"><span class="sk">Video FPS</span><span class="sv ac" id="s-vfps">-</span></div>
+          <div class="srow"><span class="sk">Video latency</span><span class="sv ac" id="s-vlat">-</span></div>
           <div class="srow"><span class="sk">Temp</span><span class="sv" id="s-temp">-</span></div>
           <div class="srow"><span class="sk">Uptime</span><span class="sv" id="s-uptime">-</span></div>
           <div class="srow" id="s-audio-row" style="display:none"><span class="sk">Audio</span><span class="sv" id="s-audio">-</span></div>
@@ -1909,7 +1910,9 @@ function setVideoTransport(mode){
     img.style.display = 'none';
     vid.style.display = '';
     startWebRTC();
+    startWebrtcStats();
   } else {
+    stopWebrtcStats();
     stopWebRTC();
     vid.style.display = 'none';
     img.style.display = '';
@@ -1923,6 +1926,7 @@ function setVideoTransport(mode){
 function _webrtcFallbackToMjpeg(reason){
   console.warn('WebRTC unavailable, falling back to MJPEG:', reason);
   clearTimeout(_webrtcTimeout);
+  stopWebrtcStats();
   stopWebRTC();
   const sel = document.getElementById('sel-mode');
   if(sel) sel.value = 'mjpeg';
@@ -2079,6 +2083,58 @@ function stopWebRTC(){
   if(abtn){ abtn.style.display = 'none'; abtn.textContent = '🔇'; }
   if(fabtn){ fabtn.style.display = 'none'; fabtn.textContent = '🔇 Audio'; }
 }
+// --- WebRTC live stats: real decoded FPS + glass-to-glass latency + loss --------
+// The status panel used to read kvmd's MJPEG counters, which are 0 on the WebRTC
+// path. getStats() on the actual RTCPeerConnection is the ground truth for what the
+// viewer sees: framesPerSecond, jitterBufferDelay (the smoothing latency), the ICE
+// round-trip time, and packet loss (the real cause of stutter over Wi-Fi).
+let _rtcPrev=null, _rtcTimer=null;
+function _webrtcPC(){ return (_janusHandle && _janusHandle.webrtcStuff && _janusHandle.webrtcStuff.pc) || null; }
+async function pollWebrtcStats(){
+  if(_activeTransport!=='h264'){ return; }
+  const pc=_webrtcPC(); if(!pc || !pc.getStats){ return; }
+  let inb=null, cp=null;
+  try{
+    const stats=await pc.getStats();
+    stats.forEach(r=>{
+      if(r.type==='inbound-rtp' && r.kind==='video') inb=r;
+      else if(r.type==='candidate-pair' && r.currentRoundTripTime!=null && (r.nominated || !cp)) cp=r;
+    });
+  }catch(e){ return; }
+  if(!inb){ return; }
+  const now=inb.timestamp;
+  const vel=document.getElementById('s-vfps'), vll=document.getElementById('s-vlat');
+  // FPS: prefer the browser's framesPerSecond, else derive from framesDecoded delta.
+  let fps=inb.framesPerSecond;
+  if(fps==null && _rtcPrev){
+    const dt=(now-_rtcPrev.ts)/1000;
+    if(dt>0) fps=(inb.framesDecoded-_rtcPrev.framesDecoded)/dt;
+  }
+  if(vel && fps!=null) vel.textContent=Math.round(fps)+' fps';
+  // Latency: avg jitter-buffer delay per frame (the biggest, tunable component) + ICE
+  // RTT + a small fixed encode/decode allowance. Reported so the trade is visible.
+  let jbMs=null;
+  if(_rtcPrev && inb.jitterBufferEmittedCount>_rtcPrev.jbCount){
+    jbMs=((inb.jitterBufferDelay-_rtcPrev.jbDelay)/(inb.jitterBufferEmittedCount-_rtcPrev.jbCount))*1000;
+  }
+  const rttMs=(cp&&cp.currentRoundTripTime!=null)?cp.currentRoundTripTime*1000:null;
+  if(vll && (jbMs!=null || rttMs!=null)){
+    // packet loss over the interval — flag it, since it's what makes video stutter.
+    let lossPct=null;
+    if(_rtcPrev && inb.packetsReceived!=null){
+      const dl=(inb.packetsLost||0)-_rtcPrev.lost, dr=inb.packetsReceived-_rtcPrev.recv;
+      if(dr+dl>0) lossPct=(dl/(dr+dl))*100;
+    }
+    const total=Math.round((jbMs||0)+(rttMs||0)+30);
+    vll.textContent=total+' ms'+((lossPct!=null&&lossPct>=1)?('  ⚠ '+lossPct.toFixed(0)+'% loss'):'');
+    vll.className=(lossPct!=null&&lossPct>=3)?'sv warn':'sv ac';
+  }
+  _rtcPrev={ ts:now, framesDecoded:inb.framesDecoded, jbDelay:inb.jitterBufferDelay,
+             jbCount:inb.jitterBufferEmittedCount, lost:(inb.packetsLost||0), recv:(inb.packetsReceived||0) };
+}
+function startWebrtcStats(){ _rtcPrev=null; clearInterval(_rtcTimer); _rtcTimer=setInterval(pollWebrtcStats, 1500); }
+function stopWebrtcStats(){ clearInterval(_rtcTimer); _rtcTimer=null; _rtcPrev=null; }
+
 function dispWinP(){send({type:'combo',codes:['MetaLeft','KeyP']});toast('Win+P →');}
 
 // Status
@@ -2234,10 +2290,18 @@ async function refreshStatus(){
     // multipart MJPEG (that was why this read "—"). Prefer delivered (queued) fps,
     // fall back to the capture source fps; show "—" only when the streamer is off.
     const _strm=st&&st.stream, _ssrc=st&&st.source, _running=!!(_strm||_ssrc);
-    const _vfps=(_strm&&_strm.queued_fps!=null)?_strm.queued_fps
-              :((_ssrc&&_ssrc.captured_fps!=null)?_ssrc.captured_fps:null);
-    const _vel=document.getElementById('s-vfps');
-    if(_vel) _vel.textContent=(_vfps!=null)?(_vfps+' fps'):(_running?'0 fps':'—');
+    // On the WebRTC path, fps + latency come from the browser's getStats
+    // (pollWebrtcStats) — the REAL decoded rate the viewer sees. Don't overwrite it
+    // with kvmd's counters here: st.stream is the idle MJPEG sink (queued_fps 0),
+    // which is exactly why "Video FPS" read 0 on WebRTC.
+    if(_activeTransport!=='h264'){
+      const _vfps=(_ssrc&&_ssrc.captured_fps!=null)?_ssrc.captured_fps
+                :((_strm&&_strm.queued_fps!=null)?_strm.queued_fps:null);
+      const _vel=document.getElementById('s-vfps');
+      if(_vel) _vel.textContent=(_vfps!=null)?(_vfps+' fps'):(_running?'0 fps':'—');
+      const _vll=document.getElementById('s-vlat');
+      if(_vll){ _vll.textContent='—'; _vll.className='sv'; }   // MJPEG: not client-measurable
+    }
     const hr=(hid&&(hid.result||hid))||{}; const hon=hr.online;
     d.hid_kb=(hon!=null)?!!hon:null; d.hid_ms=(hon!=null)?!!hon:null;
     if(cl&&cl.clients){ d.viewers=cl.clients.map(c=>({ip:c.ip,ua:c.hostname||'',secs:0})); d.clients=cl.count||cl.clients.length; }
